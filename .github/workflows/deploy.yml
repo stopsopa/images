@@ -1,0 +1,50 @@
+name: Build and Publish
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Get Node version from .tool-versions
+        id: node-version
+        run: |
+          # Extract version like '24.14.1' from 'nodejs v24.14.1'
+          VERSION=$(grep "nodejs" .tool-versions | awk '{print $2}' | sed 's/v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build
+        run: /bin/bash build.sh
+
+      - name: Remove node_modules
+        run: rm -rf node_modules
+
+      - name: Publish
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          publish_branch: gh-pages
+          force_orphan: true # Keep the gh-pages branch clean and focused on artifacts

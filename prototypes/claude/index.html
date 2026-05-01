@@ -445,34 +445,16 @@
 
         <!-- Right Panel: Result & Export -->
         <section class="panel">
-            <div class="panel-header">Preview & Export</div>
+            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Preview & Export</span>
+                <button id="float-preview-btn" class="secondary" style="padding: 0.25rem 0.75rem; font-size: 0.8rem; border-radius: 4px; margin-left: auto;">Float</button>
+            </div>
             <div class="panel-content">
                 <div class="preview-container">
                     <div class="preview-box">
                         <img id="preview-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Preview">
                         <div id="preview-placeholder" style="color: var(--text-secondary); text-align: center;">
                             <p>No image loaded</p>
-                        </div>
-                    </div>
-
-                    <div class="controls" style="grid-template-columns: 1fr 1fr; margin-top: 0; background: none; border: none; padding: 0;">
-                        <div class="control-item">
-                            <label>Download Width</label>
-                            <input type="number" id="download-width" value="1200">
-                        </div>
-                        <div class="control-item">
-                            <label>Download Height</label>
-                            <input type="number" id="download-height" value="800">
-                        </div>
-                        <div class="control-item" style="grid-column: span 2; display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
-                            <div style="flex: 1;">
-                                <label>WebP Quality</label>
-                                <input type="number" id="download-quality" value="85" min="1" max="100">
-                            </div>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none; margin-left: 1rem; margin-top: 1rem;">
-                                <input type="checkbox" id="download-lock" checked style="width: auto;">
-                                Keep Ratio
-                            </label>
                         </div>
                     </div>
 
@@ -502,6 +484,27 @@
                             <input type="number" id="pad-bottom" value="0" style="text-align: center;">
                         </div>
                         <div></div>
+                    </div>
+
+                    <div class="controls" style="grid-template-columns: 1fr 1fr; margin-top: 0; background: none; border: none; padding: 0;">
+                        <div class="control-item">
+                            <label>Download Width</label>
+                            <input type="number" id="download-width" value="1200">
+                        </div>
+                        <div class="control-item">
+                            <label>Download Height</label>
+                            <input type="number" id="download-height" value="800">
+                        </div>
+                        <div class="control-item" style="grid-column: span 2; display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
+                            <div style="flex: 1;">
+                                <label>WebP Quality</label>
+                                <input type="number" id="download-quality" value="85" min="1" max="100">
+                            </div>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none; margin-left: 1rem; margin-top: 1rem;">
+                                <input type="checkbox" id="download-lock" checked style="width: auto;">
+                                Keep Ratio
+                            </label>
+                        </div>
                     </div>
 
                     <div class="stats">
@@ -534,7 +537,9 @@
     <!-- Cropper.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 
-    <script>
+    <script type="module">
+        import drag, { getStyle } from '../../libs/drag.js';
+
         // State
         let cropper = null;
         let sourceImg = null;
@@ -576,6 +581,7 @@
             exportBtn: document.getElementById('export-btn'),
             resetBtn: document.getElementById('reset-btn'),
             toast: document.getElementById('toast'),
+            floatPreviewBtn: document.getElementById('float-preview-btn'),
             steps: [
                 document.getElementById('step-1'),
                 document.getElementById('step-2'),
@@ -640,6 +646,77 @@
             el.exportBtn.addEventListener('click', exportWebP);
             el.resetBtn.addEventListener('click', resetApp);
             
+            // Float Preview logic
+            let isPreviewFloating = false;
+            let dragInitialized = false;
+
+            el.floatPreviewBtn.addEventListener('click', () => {
+                const previewBox = document.querySelector('.preview-box');
+                isPreviewFloating = !isPreviewFloating;
+
+                if (isPreviewFloating) {
+                    el.floatPreviewBtn.textContent = 'Unfloat';
+                    
+                    const rect = previewBox.getBoundingClientRect();
+                    
+                    // Create placeholder to prevent layout collapse
+                    const placeholder = document.createElement('div');
+                    placeholder.id = 'preview-box-placeholder';
+                    placeholder.style.width = '100%';
+                    placeholder.style.aspectRatio = '1/1';
+                    previewBox.parentNode.insertBefore(placeholder, previewBox);
+                    
+                    // Move to body to escape backdrop-filter containing block
+                    document.body.appendChild(previewBox);
+
+                    previewBox.style.position = 'fixed';
+                    previewBox.style.zIndex = '1000';
+                    
+                    // Position at top 10px, right 10px
+                    const topPos = 10;
+                    const leftPos = window.innerWidth - rect.width - 10;
+                    
+                    previewBox.style.left = `${leftPos}px`;
+                    previewBox.style.top = `${topPos}px`;
+                    previewBox.style.width = `${rect.width}px`;
+                    previewBox.style.height = `${rect.height}px`;
+                    previewBox.style.boxShadow = '0 20px 40px rgba(0,0,0,0.8)';
+                    previewBox.style.cursor = 'move';
+
+                    if (!dragInitialized) {
+                        dragInitialized = true;
+                        drag(
+                          previewBox,
+                          (x, y) => {
+                            previewBox.style.left = `${x}px`;
+                            previewBox.style.top = `${y}px`;
+                          },
+                          () => {
+                            const s = getStyle(previewBox);
+                            return { x: parseInt(s.left, 10) || 0, y: parseInt(s.top, 10) || 0 };
+                          }
+                        );
+                    }
+                } else {
+                    el.floatPreviewBtn.textContent = 'Float';
+                    
+                    const placeholder = document.getElementById('preview-box-placeholder');
+                    if (placeholder) {
+                        placeholder.parentNode.insertBefore(previewBox, placeholder);
+                        placeholder.remove();
+                    }
+                    
+                    previewBox.style.position = '';
+                    previewBox.style.zIndex = '';
+                    previewBox.style.left = '';
+                    previewBox.style.top = '';
+                    previewBox.style.width = '100%';
+                    previewBox.style.height = '';
+                    previewBox.style.boxShadow = '';
+                    previewBox.style.cursor = '';
+                }
+            });
+
             setupScrubbableInputs();
         }
 

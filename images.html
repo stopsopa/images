@@ -274,7 +274,7 @@
         #image-popover[data-popover] {
             border: none;
             border-radius: 12px;
-            padding: 20px;
+            padding: 24px;
             background: white;
             box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.3);
             width: max-content;
@@ -288,7 +288,7 @@
 
         .popover-content {
             display: flex;
-            gap: 24px;
+            gap: 28px;
             align-items: flex-start;
         }
 
@@ -313,14 +313,14 @@
         .popover-inputs {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 24px;
             flex-grow: 1;
         }
 
         .popover-row {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
         }
 
         .popover-row label {
@@ -328,15 +328,21 @@
             font-weight: 800;
             color: #64748b;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.1em;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
 
         /* Expandable Input Trick */
         .input-wrapper {
             position: relative;
             display: inline-grid;
-            width: 100%;
-            min-width: 400px;
+            flex-grow: 1;
+            min-width: 350px;
         }
 
         .input-mirror {
@@ -346,7 +352,7 @@
             padding: 12px 14px;
             font-size: 0.85rem;
             font-family: 'JetBrains Mono', monospace;
-            border: 1px solid transparent; /* matches input border */
+            border: 1px solid transparent;
         }
 
         .popover-row input {
@@ -367,7 +373,40 @@
         .popover-row input:focus {
             border-color: var(--accent-color);
             background: white;
-            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15);
+            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
+        }
+
+        .copy-btn {
+            background: #f1f5f9;
+            color: var(--accent-color);
+            border: 1px solid #e2e8f0;
+            padding: 0 16px;
+            height: 44px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.2);
+        }
+
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+
+        .copy-btn.success {
+            background: #22c55e;
+            color: white;
+            border-color: #22c55e;
         }
 
         #loader {
@@ -482,16 +521,22 @@
             <div class="popover-inputs">
                 <div class="popover-row">
                     <label>Absolute Path</label>
-                    <div class="input-wrapper">
-                        <div id="abs-mirror" class="input-mirror"></div>
-                        <input type="text" id="pop-abs-path" readonly>
+                    <div class="input-group">
+                        <div class="input-wrapper">
+                            <div id="abs-mirror" class="input-mirror"></div>
+                            <input type="text" id="pop-abs-path" readonly>
+                        </div>
+                        <button class="copy-btn" data-target="pop-abs-path">Copy</button>
                     </div>
                 </div>
                 <div class="popover-row">
                     <label>Markdown Link</label>
-                    <div class="input-wrapper">
-                        <div id="md-mirror" class="input-mirror"></div>
-                        <input type="text" id="pop-md-link" readonly>
+                    <div class="input-group">
+                        <div class="input-wrapper">
+                            <div id="md-mirror" class="input-mirror"></div>
+                            <input type="text" id="pop-md-link" readonly>
+                        </div>
+                        <button class="copy-btn" data-target="pop-md-link">Copy</button>
                     </div>
                 </div>
             </div>
@@ -587,6 +632,28 @@
             
             document.getElementById('count-visible').textContent = images.length;
         }
+
+        // Setup Copy Buttons
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const targetId = btn.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                
+                try {
+                    await navigator.clipboard.writeText(input.value);
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Copied!';
+                    btn.classList.add('success');
+                    
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.classList.remove('success');
+                    }, 2000);
+                } catch (err) {
+                    console.error('Failed to copy: ', err);
+                }
+            });
+        });
 
         function applyFilters() {
             const wOp = document.getElementById('w-op').value;

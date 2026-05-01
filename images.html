@@ -274,21 +274,21 @@
         #image-popover[data-popover] {
             border: none;
             border-radius: 12px;
-            padding: 16px;
+            padding: 20px;
             background: white;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.3);
             width: max-content;
-            max-width: 90vw;
+            max-width: 95vw;
         }
 
         #image-popover::backdrop {
-            background: rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(2px);
+            background: rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(4px);
         }
 
         .popover-content {
             display: flex;
-            gap: 20px;
+            gap: 24px;
             align-items: flex-start;
         }
 
@@ -296,31 +296,31 @@
             background-image: repeating-conic-gradient(#f1f5f9 0% 25%, #ffffff 0% 50%);
             background-position: 0 0;
             background-size: 20px 20px;
-            border-radius: 6px;
+            border-radius: 8px;
             overflow: hidden;
             flex-shrink: 0;
             border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         .popover-image img {
             display: block;
-            max-height: 300px;
-            max-width: 300px;
+            max-height: 400px;
+            max-width: 400px;
             object-fit: contain;
         }
 
         .popover-inputs {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 20px;
             flex-grow: 1;
-            min-width: 350px;
         }
 
         .popover-row {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 8px;
         }
 
         .popover-row label {
@@ -328,26 +328,46 @@
             font-weight: 800;
             color: #64748b;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
+        }
+
+        /* Expandable Input Trick */
+        .input-wrapper {
+            position: relative;
+            display: inline-grid;
+            width: 100%;
+            min-width: 400px;
+        }
+
+        .input-mirror {
+            grid-area: 1 / 1;
+            visibility: hidden;
+            white-space: pre;
+            padding: 12px 14px;
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid transparent; /* matches input border */
         }
 
         .popover-row input {
+            grid-area: 1 / 1;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 10px 12px;
-            font-size: 0.8rem;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 0.85rem;
             font-family: 'JetBrains Mono', monospace;
             width: 100%;
             box-sizing: border-box;
             outline: none;
             color: var(--text-color);
+            transition: all 0.2s ease;
         }
 
         .popover-row input:focus {
             border-color: var(--accent-color);
             background: white;
-            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15);
         }
 
         #loader {
@@ -462,11 +482,17 @@
             <div class="popover-inputs">
                 <div class="popover-row">
                     <label>Absolute Path</label>
-                    <input type="text" id="pop-abs-path" readonly>
+                    <div class="input-wrapper">
+                        <div id="abs-mirror" class="input-mirror"></div>
+                        <input type="text" id="pop-abs-path" readonly>
+                    </div>
                 </div>
                 <div class="popover-row">
                     <label>Markdown Link</label>
-                    <input type="text" id="pop-md-link" readonly>
+                    <div class="input-wrapper">
+                        <div id="md-mirror" class="input-mirror"></div>
+                        <input type="text" id="pop-md-link" readonly>
+                    </div>
                 </div>
             </div>
         </div>
@@ -528,11 +554,19 @@
                     const popover = document.getElementById('image-popover');
                     const absInput = document.getElementById('pop-abs-path');
                     const mdInput = document.getElementById('pop-md-link');
+                    const absMirror = document.getElementById('abs-mirror');
+                    const mdMirror = document.getElementById('md-mirror');
                     const popImg = document.getElementById('pop-img');
                     
                     const absPath = window.location.origin + '/' + img.path;
+                    const mdLink = `![${filename}](${absPath})`;
+                    
                     absInput.value = absPath;
-                    mdInput.value = `![${filename}](${absPath})`;
+                    absMirror.textContent = absPath;
+                    
+                    mdInput.value = mdLink;
+                    mdMirror.textContent = mdLink;
+                    
                     popImg.src = img.path;
                     popImg.alt = filename;
                     
@@ -544,7 +578,7 @@
                     
                     // Auto-select text on click
                     [absInput, mdInput].forEach(input => {
-                        input.addEventListener('click', () => input.select());
+                        input.onclick = () => input.select();
                     });
                 });
                 

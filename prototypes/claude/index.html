@@ -497,7 +497,7 @@
                         </div>
                         <div class="control-item" style="grid-column: span 2; display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
                             <div style="flex: 1;">
-                                <label>WebP Quality</label>
+                                <label>Image Quality</label>
                                 <input type="number" id="download-quality" value="85" min="1" max="100">
                             </div>
                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none; margin-left: 1rem; margin-top: 1rem;">
@@ -522,9 +522,21 @@
                         </div>
                     </div>
 
-                    <div class="actions">
+                    <div class="format-selection" style="display: flex; gap: 1.5rem; margin-top: 1.5rem; justify-content: center; padding: 1rem; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none; font-weight: 600;">
+                            <input type="radio" name="export-format" value="webp" checked style="width: 1.2rem; height: 1.2rem; margin: 0; accent-color: var(--accent-color);"> WebP
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none; font-weight: 600;">
+                            <input type="radio" name="export-format" value="png" style="width: 1.2rem; height: 1.2rem; margin: 0; accent-color: var(--accent-color);"> PNG
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none; font-weight: 600;">
+                            <input type="radio" name="export-format" value="jpeg" style="width: 1.2rem; height: 1.2rem; margin: 0; accent-color: var(--accent-color);"> JPEG
+                        </label>
+                    </div>
+
+                    <div class="actions" style="margin-top: 1rem; padding-top: 0;">
                         <button id="export-btn" style="width: 100%; justify-content: center; padding: 1rem; font-size: 1.1rem;" disabled>
-                            Download WebP
+                            Download Image
                         </button>
                     </div>
                 </div>
@@ -643,7 +655,12 @@
             });
             el.downloadQuality.addEventListener('input', updatePreviewDebounced);
 
-            el.exportBtn.addEventListener('click', exportWebP);
+            const formatRadios = document.querySelectorAll('input[name="export-format"]');
+            formatRadios.forEach(radio => {
+                radio.addEventListener('change', updatePreviewDebounced);
+            });
+
+            el.exportBtn.addEventListener('click', exportImage);
             el.resetBtn.addEventListener('click', resetApp);
             
             // Float Preview logic
@@ -1032,6 +1049,8 @@
             
             isProcessing = true;
             const quality = parseInt(el.downloadQuality.value) || 85;
+            const format = document.querySelector('input[name="export-format"]:checked').value;
+            const mimeType = `image/${format}`;
             const canvas = createFinalCanvas();
 
             if (!canvas) {
@@ -1041,20 +1060,24 @@
 
             canvas.toBlob((blob) => {
                 if (blob) {
-                    const webpUrl = URL.createObjectURL(blob);
-                    el.previewImg.src = webpUrl;
+                    const url = URL.createObjectURL(blob);
+                    el.previewImg.src = url;
                     el.previewPlaceholder.classList.add('hidden');
                     el.previewImg.classList.remove('hidden');
                     el.stats.file.textContent = formatBytes(blob.size);
                 }
                 isProcessing = false;
-            }, 'image/webp', quality / 100);
+            }, mimeType, quality / 100);
         }
 
-        async function exportWebP() {
+        async function exportImage() {
             if (!cropper) return;
             
             const quality = parseInt(el.downloadQuality.value) || 85;
+            const format = document.querySelector('input[name="export-format"]:checked').value;
+            const mimeType = `image/${format}`;
+            const ext = format === 'jpeg' ? 'jpg' : format;
+            
             updateSteps(2);
 
             const canvas = createFinalCanvas();
@@ -1064,11 +1087,11 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `processed_${Date.now()}.webp`;
+                a.download = `processed_${Date.now()}.${ext}`;
                 a.click();
                 showToast('Image exported!', 3000, '#10b981');
                 setTimeout(() => updateSteps(1), 2000);
-            }, 'image/webp', quality / 100);
+            }, mimeType, quality / 100);
         }
 
         function updateSteps(idx) {

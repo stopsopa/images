@@ -2,6 +2,8 @@ set -e
 
 export NODE_OPTIONS=""
 
+node process.ts | tee process.json
+
 cat <<EEE
 
   typechecking...

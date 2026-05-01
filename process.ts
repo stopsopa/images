@@ -4,7 +4,7 @@ import sharp from "sharp";
 import Semaphore from "./libs/Semaphore.ts";
 
 /**
- * NODE_OPTIONS="" node process.ts > process.json
+ * NODE_OPTIONS="" node process.ts | tee process.json
  */
 async function main() {
   let hasError = false;
@@ -23,6 +23,7 @@ async function main() {
           stats.size,
           metadata.width || 0,
           metadata.height || 0,
+          (stats.birthtime || stats.mtime || new Date()).toISOString(),
         ];
 
         process.stdout.write(JSON.stringify(row) + "\n");

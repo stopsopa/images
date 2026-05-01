@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Gallery - Masonry Layout</title>
+    <link rel="stylesheet" href="libs/popover.css">
     <style>
         :root {
             --bg-color: #ffffff;
@@ -11,6 +12,7 @@
             --text-color: #0f172a;
             --accent-color: #0ea5e9;
             --gap: 2px;
+            --popover-offset: 10px;
         }
 
         body {
@@ -43,26 +45,60 @@
             min-height: 44px;
         }
 
-        .title {
+        .header-left {
             position: absolute;
             left: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .header-right {
+            position: absolute;
+            right: 0;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .title {
             font-weight: 800;
             font-size: 1rem;
             color: var(--text-color);
             letter-spacing: -0.025em;
             opacity: 0.8;
+            white-space: nowrap;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 12px;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #64748b;
+            font-size: 0.7rem;
+            font-weight: 800;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent-color);
         }
 
         .filters {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             align-items: center;
+            flex-wrap: wrap;
         }
 
         .filter-group {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             background: #f1f5f9;
             padding: 4px 10px;
             border-radius: 6px;
@@ -74,7 +110,7 @@
         }
 
         .filter-group label {
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             text-transform: uppercase;
             color: #64748b;
             font-weight: 800;
@@ -86,13 +122,13 @@
             background: transparent;
             border: none;
             color: var(--text-color);
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             outline: none;
             font-family: inherit;
         }
 
         .filter-group input {
-            width: 50px;
+            width: 45px;
             border-bottom: 1px solid transparent;
             padding: 2px 0;
             text-align: center;
@@ -102,7 +138,7 @@
 
         .filter-group input[type="date"] {
             width: auto;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
         }
 
         .filter-group input:focus {
@@ -115,24 +151,22 @@
             font-weight: 700;
         }
 
-        .unit-select {
+        .unit-select, .order-select {
             font-size: 0.65rem !important;
             font-weight: 800 !important;
             color: #64748b !important;
-            margin-left: -4px;
         }
 
         .reset-btn {
             background: #fee2e2;
             color: #dc2626;
             border: none;
-            padding: 6px 14px;
+            padding: 6px 12px;
             border-radius: 6px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.2s ease;
-            margin-left: 5px;
         }
 
         .reset-btn:hover {
@@ -141,11 +175,9 @@
         }
 
         .stats-bar {
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             color: #94a3b8;
-            position: absolute;
-            right: 0;
-            font-weight: 500;
+            font-weight: 600;
         }
 
         /* Masonry Layout Technique from CSS Play Emulation */
@@ -192,8 +224,7 @@
         .item .info {
             position: absolute;
             bottom: 0;
-            left: 0;
-            right: 0;
+            left: 0;right: 0;
             padding: 5px;
             background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(4px);
@@ -239,6 +270,55 @@
             font-family: 'JetBrains Mono', monospace;
         }
 
+        /* Popover Styles */
+        #image-popover[data-popover] {
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            background: white;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            width: 320px;
+        }
+
+        #image-popover::backdrop {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .popover-content {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .popover-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .popover-row label {
+            font-size: 0.6rem;
+            font-weight: 800;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+
+        .popover-row input {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            width: 100%;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        .popover-row input:focus {
+            border-color: var(--accent-color);
+        }
+
         #loader {
             text-align: center;
             padding: 4rem;
@@ -263,7 +343,9 @@
 
     <header>
         <div class="header-main">
-            <div class="title">SOPA // Gallery</div>
+            <div class="header-left">
+                <div class="title">SOPA // Gallery</div>
+            </div>
             <div class="filters">
                 <div class="filter-group">
                     <label>W</label>
@@ -310,16 +392,49 @@
                     </select>
                     <input type="date" id="d-val">
                 </div>
+                <div class="filter-group">
+                    <label>Sort</label>
+                    <select id="sort-by">
+                        <option value="none">none</option>
+                        <option value="width">W</option>
+                        <option value="height">H</option>
+                        <option value="size">Size</option>
+                        <option value="date">Date</option>
+                    </select>
+                    <select id="sort-order" class="order-select">
+                        <option value="asc">Asc</option>
+                        <option value="desc">Desc</option>
+                    </select>
+                </div>
                 <button id="reset-filters" class="reset-btn">Reset</button>
             </div>
-            <div id="stats-bar" class="stats-bar">
-                <span id="count-visible">0</span> / <span id="count-total">0</span> images
+            <div class="header-right">
+                <nav class="nav-links">
+                    <a href="index.html">Editor</a>
+                    <a href="fetch.html">Fetch</a>
+                </nav>
+                <div id="stats-bar" class="stats-bar">
+                    <span id="count-visible">0</span> / <span id="count-total">0</span>
+                </div>
             </div>
         </div>
     </header>
 
     <div id="loader">Discovering images...</div>
     <div class="masonry" id="gallery"></div>
+
+    <div id="image-popover" popover data-popover class="right">
+        <div class="popover-content">
+            <div class="popover-row">
+                <label>Absolute Path</label>
+                <input type="text" id="pop-abs-path" readonly>
+            </div>
+            <div class="popover-row">
+                <label>Markdown Link</label>
+                <input type="text" id="pop-md-link" readonly>
+            </div>
+        </div>
+    </div>
 
     <script type="module">
         import toHumanReadable from './libs/toHumanReadable.js';
@@ -372,6 +487,27 @@
                         <div class="date-meta">${img.date ? img.date.split('T')[0] : ''}</div>
                     </div>
                 `;
+
+                item.addEventListener('click', (e) => {
+                    const popover = document.getElementById('image-popover');
+                    const absInput = document.getElementById('pop-abs-path');
+                    const mdInput = document.getElementById('pop-md-link');
+                    
+                    const absPath = window.location.origin + '/' + img.path;
+                    absInput.value = absPath;
+                    mdInput.value = `![${filename}](${absPath})`;
+                    
+                    // Chromium 125+ Anchor Positioning
+                    item.style.anchorName = '--active-item';
+                    popover.style.positionAnchor = '--active-item';
+                    
+                    popover.showPopover();
+                    
+                    // Auto-select text on click
+                    [absInput, mdInput].forEach(input => {
+                        input.addEventListener('click', () => input.select());
+                    });
+                });
                 
                 gallery.appendChild(item);
             }
@@ -389,8 +525,10 @@
             const sUnit = document.getElementById('s-unit').value;
             const dOp = document.getElementById('d-op').value;
             const dVal = document.getElementById('d-val').value;
+            const sortBy = document.getElementById('sort-by').value;
+            const sortOrder = document.getElementById('sort-order').value;
 
-            const filtered = allImages.filter(img => {
+            let filtered = allImages.filter(img => {
                 let match = true;
 
                 // Width filter
@@ -412,9 +550,7 @@
                     let divisor = 1;
                     if (sUnit === 'KB') divisor = 1024;
                     if (sUnit === 'MB') divisor = 1024 * 1024;
-                    
                     const imgVal = img.size / divisor;
-                    
                     if (sOp === '>' && !(imgVal > sVal)) match = false;
                     if (sOp === '<' && !(imgVal < sVal)) match = false;
                     if (sOp === '=') {
@@ -436,6 +572,22 @@
 
                 return match;
             });
+
+            if (sortBy !== 'none') {
+                filtered.sort((a, b) => {
+                    let valA = a[sortBy];
+                    let valB = b[sortBy];
+                    
+                    if (sortBy === 'date') {
+                        valA = valA ? new Date(valA).getTime() : 0;
+                        valB = valB ? new Date(valB).getTime() : 0;
+                    }
+
+                    if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+                    if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+                    return 0;
+                });
+            }
 
             renderGallery(filtered);
         }
@@ -515,35 +667,26 @@
 
             try {
                 const response = await fetch('process.json');
-                
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch process.json: ${response.status} ${response.statusText}`);
-                }
-
+                if (!response.ok) throw new Error(`Failed to fetch process.json`);
                 let body = response.body;
-                
                 if (Object.prototype.toString.call(body) === '[object ReadableStream]') {
                     body = await streamToString(body);
                 }
-
                 const lines = body.split('\n').filter(line => line.trim());
-                
                 loader.style.display = 'none';
-
                 allImages = lines.map(line => {
                     const [path, size, width, height, date] = JSON.parse(line);
                     return { path, size, width, height, date };
                 });
-
                 document.getElementById('count-total').textContent = allImages.length;
                 renderGallery(allImages);
 
-                // Setup filter listeners
-                ['w-op', 'w-val', 'h-op', 'h-val', 's-op', 's-val', 's-unit', 'd-op', 'd-val'].forEach(id => {
+                // Setup filter and sort listeners
+                ['w-op', 'w-val', 'h-op', 'h-val', 's-op', 's-val', 's-unit', 'd-op', 'd-val', 'sort-by', 'sort-order'].forEach(id => {
                     const el = document.getElementById(id);
                     if (!el) return;
                     el.addEventListener('input', applyFilters);
-                    if (id.endsWith('-op') || id.endsWith('-unit')) {
+                    if (id.endsWith('-op') || id.endsWith('-unit') || id.startsWith('sort-')) {
                         el.addEventListener('change', applyFilters);
                     }
                 });
@@ -558,18 +701,16 @@
                     document.getElementById('s-unit').value = 'KB';
                     document.getElementById('d-op').value = 'any';
                     document.getElementById('d-val').value = '';
+                    document.getElementById('sort-by').value = 'none';
+                    document.getElementById('sort-order').value = 'asc';
                     applyFilters();
                 });
 
                 setupScrubbableInputs();
-
             } catch (error) {
                 console.error('Error loading gallery:', error);
                 loader.style.animation = 'none';
-                loader.innerHTML = `
-                    <div style="color: #ef4444; margin-bottom: 1rem;">Failed to load assets</div>
-                    <div style="font-size: 0.875rem;">${error.message}</div>
-                `;
+                loader.innerHTML = `<div style="color: #ef4444;">Failed to load assets: ${error.message}</div>`;
             }
         }
 

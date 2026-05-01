@@ -10,11 +10,9 @@ interface TargetInfo {
 }
 
 /**
- * node libs/determineTarget.ts
+ * node libs/determineTarget.ts raw/ai/perplexity.png
  */
 export default function determineTarget(inputPath: string): TargetInfo {
-  // Replace 'raw' directory with 'img'
-  // Assuming inputPath starts with 'raw/' or contains '/raw/'
   let targetPath = inputPath.replace(/^raw\//, "img/");
 
   const parsed = path.parse(targetPath);
@@ -39,10 +37,15 @@ export default function determineTarget(inputPath: string): TargetInfo {
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
+) {
   const testPath = process.argv[2];
   if (!testPath) {
-    throw new Error("Missing path argument. Usage: node libs/determineTarget.ts <path>");
+    throw new Error(
+      "Missing path argument. Usage: node libs/determineTarget.ts <path>",
+    );
   }
   console.log(`Input: ${testPath}`);
   console.log(determineTarget(testPath));

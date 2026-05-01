@@ -296,14 +296,14 @@
         .preview-box {
             width: 100%;
             aspect-ratio: 1/1;
-            background-color: #000;
+            background: #000;
             border-radius: 8px;
-            border: 1px solid var(--border-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
             overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.25);
             position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         #preview-img {
@@ -522,6 +522,11 @@
                         </div>
                     </div>
 
+                    <div class="control-item" style="margin-top: 1.5rem; margin-bottom: -0.5rem;">
+                        <label>Output Filename</label>
+                        <input type="text" id="filename-input" value="image_1200x800q85" style="width: 100%; font-family: var(--font-mono); font-size: 0.9rem;">
+                    </div>
+
                     <div class="format-selection" style="display: flex; gap: 1.5rem; margin-top: 1.5rem; justify-content: center; padding: 1rem; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid var(--border-color);">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none; font-weight: 600;">
                             <input type="radio" name="export-format" value="webp" checked style="width: 1.2rem; height: 1.2rem; margin: 0; accent-color: var(--accent-color);"> WebP
@@ -565,6 +570,12 @@
         let startRatio = 1;
         let startBox = null;
 
+        let originalBaseName = 'image';
+        let filenameUserTouched = false;
+        let currentNameWidth = 1200;
+        let currentNameHeight = 800;
+        let currentNameQuality = 85;
+
         // Elements
         const el = {
             inputStage: document.getElementById('input-stage'),
@@ -584,6 +595,7 @@
             downloadHeight: document.getElementById('download-height'),
             downloadQuality: document.getElementById('download-quality'),
             downloadLock: document.getElementById('download-lock'),
+            filenameInput: document.getElementById('filename-input'),
             
             padTop: document.getElementById('pad-top'),
             padRight: document.getElementById('pad-right'),
@@ -654,6 +666,10 @@
                 if (el.downloadLock.checked) onDownloadWidthChange();
             });
             el.downloadQuality.addEventListener('input', updatePreviewDebounced);
+            
+            el.filenameInput.addEventListener('input', () => {
+                filenameUserTouched = true;
+            });
 
             const formatRadios = document.querySelectorAll('input[name="export-format"]');
             formatRadios.forEach(radio => {
@@ -819,6 +835,9 @@
 
         function loadBlob(blob) {
             currentBlob = blob;
+            originalBaseName = blob.name ? blob.name.replace(/\.[^/.]+$/, "") : 'image';
+            filenameUserTouched = false;
+            
             const url = URL.createObjectURL(blob);
             sourceImg = new Image();
             sourceImg.onload = () => {
@@ -840,7 +859,7 @@
             
             el.imgToCrop.src = url;
             cropper = new Cropper(el.imgToCrop, {
-                viewMode: 1,
+                viewMode: 0,
                 dragMode: 'move',
                 autoCropArea: 0.8,
                 restore: false,
@@ -1044,10 +1063,40 @@
             previewTimeout = setTimeout(updatePreview, 100);
         }
 
+        function syncFilenameInputs() {
+            const newW = parseInt(el.downloadWidth.value) || 1;
+            const newH = parseInt(el.downloadHeight.value) || 1;
+            const newQ = parseInt(el.downloadQuality.value) || 85;
+
+            if (!filenameUserTouched) {
+                el.filenameInput.value = `${originalBaseName}_${newW}x${newH}q${newQ}`;
+            } else {
+                let val = el.filenameInput.value;
+                
+                if (newW !== currentNameWidth) {
+                    val = val.replace(/\d+x(?!.*\d+x)/, `${newW}x`);
+                }
+                if (newH !== currentNameHeight) {
+                    val = val.replace(/x\d+(?!.*x\d+)/, `x${newH}`);
+                }
+                if (newQ !== currentNameQuality) {
+                    val = val.replace(/q\d+(?!.*q\d+)/, `q${newQ}`);
+                }
+                
+                el.filenameInput.value = val;
+            }
+
+            currentNameWidth = newW;
+            currentNameHeight = newH;
+            currentNameQuality = newQ;
+        }
+
         function updatePreview() {
             if (!cropper || isProcessing) return;
             
             isProcessing = true;
+            syncFilenameInputs();
+            
             const quality = parseInt(el.downloadQuality.value) || 85;
             const format = document.querySelector('input[name="export-format"]:checked').value;
             const mimeType = `image/${format}`;
@@ -1087,7 +1136,8 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `processed_${Date.now()}.${ext}`;
+                const baseName = el.filenameInput.value.trim() || 'image';
+                a.download = `${baseName}.${ext}`;
                 a.click();
                 showToast('Image exported!', 3000, '#10b981');
                 setTimeout(() => updateSteps(1), 2000);

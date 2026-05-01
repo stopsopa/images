@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CORS Proxy Tester</title>
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        padding: 2rem;
+        margin: 0;
+        background: #0a0a0c;
+        color: #f8fafc;
+      }
+      .form-group {
+        margin-bottom: 1rem;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 0.75rem;
+        font-size: 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        border-radius: 8px;
+        box-sizing: border-box;
+      }
+      .radio-group {
+        margin: 1.5rem 0;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        display: flex;
+        gap: 1.5rem;
+        opacity: 0.5;
+        pointer-events: none;
+        transition: opacity 0.3s;
+      }
+      .radio-group.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      label.radio-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+      }
+      button {
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+        cursor: pointer;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        width: 100%;
+        font-weight: 600;
+      }
+      button:disabled {
+        background: #475569;
+        cursor: not-allowed;
+      }
+      .error {
+        color: #ef4444;
+        margin-top: 1rem;
+        font-weight: 600;
+      }
+      .success {
+        color: #10b981;
+        margin-top: 1rem;
+        font-weight: 600;
+      }
+      canvas {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        margin-top: 1rem;
+        max-width: 50%;
+        border-radius: 8px;
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CORS Proxy Tester</h1>
+
+    <div class="form-group">
+      <label for="url" style="display: block; margin-bottom: 0.5rem"
+        >Image URL:</label
+      >
+      <input
+        type="text"
+        id="url"
+        placeholder="https://example.com/image.jpg"
+        value="https://i.pinimg.com/originals/c7/ed/fa/c7edfa1dc7779f20d913317bf21dc186.jpg"
+      />
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; width: 100%">
+      <button id="load-all-btn" style="flex-grow: 1" disabled>
+        Load All Proxies
+      </button>
+      <button
+        id="clear-btn"
+        style="
+          width: auto;
+          padding-left: 1.5rem;
+          padding-right: 1.5rem;
+          background: #475569;
+        "
+        title="Clear Canvas"
+      >
+        X
+      </button>
+    </div>
+
+    <div
+      id="results-container"
+      style="display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 2rem"
+    >
+      <!-- Proxy boxes will be injected here -->
+    </div>
+
+    <script type="module">
+      import loadCorsproxy from "./libs/fetchProxy/corsproxy.js";
+      import loadCodetabs from "./libs/fetchProxy/codetabs.js";
+      import loadCorsAnywhere from "./libs/fetchProxy/cors-anywhere.js";
+      import loadAllorigins from "./libs/fetchProxy/allorigins.js";
+      import loadEveryorigin from "./libs/fetchProxy/everyorigin.js";
+      import loadWeserv from "./libs/fetchProxy/weserv.js";
+
+      const proxies = {
+        corsproxy: loadCorsproxy,
+        codetabs: loadCodetabs,
+        "cors-anywhere": loadCorsAnywhere,
+        allorigins: loadAllorigins,
+        everyorigin: loadEveryorigin,
+        weserv: loadWeserv,
+      };
+
+      const urlInput = document.getElementById("url");
+      const loadAllBtn = document.getElementById("load-all-btn");
+      const clearBtn = document.getElementById("clear-btn");
+      const resultsContainer = document.getElementById("results-container");
+
+      // Render result boxes dynamically based on the central object
+      Object.keys(proxies).forEach((proxyName) => {
+        const box = document.createElement("div");
+        box.id = `box-${proxyName}`;
+        box.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+        box.style.background = "rgba(255, 255, 255, 0.02)";
+        box.style.borderRadius = "8px";
+        box.style.padding = "1rem";
+        box.style.flex = "1 1 300px";
+
+        box.innerHTML = `
+                <h3 style="margin-top: 0; font-size: 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; margin-bottom: 1rem;">${proxyName}</h3>
+                <div class="status-msg" style="margin-bottom: 1rem; font-weight: 600; font-size: 0.9rem; word-break: break-all;">Waiting...</div>
+                <canvas width="0" height="0" style="display: none; width: 100%; height: 200px; object-fit: contain; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px;"></canvas>
+            `;
+        resultsContainer.appendChild(box);
+      });
+
+      urlInput.addEventListener("input", () => {
+        loadAllBtn.disabled = urlInput.value.trim().length === 0;
+      });
+
+      // Trigger initial state
+      urlInput.dispatchEvent(new Event("input"));
+
+      clearBtn.addEventListener("click", () => {
+        Object.keys(proxies).forEach((proxyName) => {
+          const box = document.getElementById(`box-${proxyName}`);
+          const canvas = box.querySelector("canvas");
+          const statusMsg = box.querySelector(".status-msg");
+
+          canvas.width = 0;
+          canvas.height = 0;
+          canvas.style.display = "none";
+
+          statusMsg.textContent = "Waiting...";
+          statusMsg.className = "status-msg";
+          statusMsg.style.color = "";
+        });
+      });
+
+      loadAllBtn.addEventListener("click", () => {
+        const url = urlInput.value.trim();
+        loadAllBtn.disabled = true;
+
+        const promises = Object.entries(proxies).map(
+          async ([proxyName, loader]) => {
+            const box = document.getElementById(`box-${proxyName}`);
+            const canvas = box.querySelector("canvas");
+            const ctx = canvas.getContext("2d");
+            const statusMsg = box.querySelector(".status-msg");
+
+            statusMsg.className = "status-msg";
+            statusMsg.style.color = "#3b82f6";
+            statusMsg.textContent = `Fetching...`;
+
+            canvas.width = 0;
+            canvas.height = 0;
+            canvas.style.display = "none";
+
+            try {
+              const blob = await loader(url);
+              const objectUrl = URL.createObjectURL(blob);
+
+              await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                  canvas.width = img.naturalWidth;
+                  canvas.height = img.naturalHeight;
+                  ctx.drawImage(img, 0, 0);
+
+                  statusMsg.style.color = "#10b981";
+                  statusMsg.textContent = `Success!`;
+                  canvas.style.display = "block";
+
+                  URL.revokeObjectURL(objectUrl);
+                  resolve();
+                };
+                img.onerror = () => {
+                  reject(
+                    new Error("Failed to decode image data after fetching."),
+                  );
+                };
+                img.src = objectUrl;
+              });
+            } catch (err) {
+              statusMsg.style.color = "#ef4444";
+              statusMsg.textContent = err.message || String(err);
+            }
+          },
+        );
+
+        Promise.allSettled(promises).then(() => {
+          loadAllBtn.disabled = false;
+        });
+      });
+    </script>
+  </body>
+</html>

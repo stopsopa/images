@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "NodeNext",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "strict": true, // generally good idea but also required by zod: https://zod.dev/#strict
+
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+
+    // for --experimental-strip-types // https://nodejs.org/api/typescript.html#type-stripping
+    "noEmit": true, // Optional - see note below
+    "target": "ESNext",
+    "module": "NodeNext",
+    "rewriteRelativeImportExtensions": true,
+    // "erasableSyntaxOnly": true, // add this one if you will not use --experimental-transform-types
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "types": ["node"]
+  },
+  // "include": [
+  //   "src/**/*.ts",
+  //   "src/**/*.tsx",
+  //   "server/**/*.ts",
+  //   "modules/**/*.ts",
+  //   "scripts/**/*.ts",
+  //   "db/**/*.ts",
+  //   "shared/**/*.ts"
+  // ],
+  "exclude": ["node_modules", "models_from_other_project"]
+}

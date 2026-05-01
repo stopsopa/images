@@ -7,6 +7,7 @@ interface TargetInfo {
   dir: string;
   file: string;
   abs: string;
+  meta: string;
 }
 
 /**
@@ -19,6 +20,10 @@ export default function determineTarget(inputPath: string): TargetInfo {
   const dir = parsed.dir;
   const name = parsed.name;
   const ext = ".webp";
+
+  // Calculate meta path from inputPath
+  const inputParsed = path.parse(inputPath);
+  const meta = path.join(inputParsed.dir, `${inputParsed.name}.json`);
 
   let counter = 0;
   let finalFile = `${name}${ext}`;
@@ -34,6 +39,7 @@ export default function determineTarget(inputPath: string): TargetInfo {
     dir,
     file: finalFile,
     abs,
+    meta,
   };
 }
 

@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOPA Images | Premium Image Processor</title>
+    <meta name="description" content="A premium, client-side image processor for cropping, resizing, and exporting to WebP.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Cropper.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #0a0a0c;
+            --panel-bg: rgba(20, 20, 25, 0.7);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-blur: blur(12px);
+            --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+            --radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 40%);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #444; }
+
+        header {
+            padding: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(10, 10, 12, 0.8);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: 800;
+            font-size: 1.5rem;
+            letter-spacing: -0.05em;
+            background: linear-gradient(135deg, #fff 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .step-indicator {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .step {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: color 0.3s ease;
+        }
+
+        .step.active {
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        .step.active::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-color);
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            padding: 2rem;
+            flex-grow: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            backdrop-filter: var(--glass-blur);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .panel-content {
+            padding: 1.5rem;
+            flex-grow: 1;
+        }
+
+        /* Dropzone & Input */
+        .input-stage {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            height: 100%;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .drop-zone {
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 16/9;
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--glass-bg);
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--accent-color);
+            background: rgba(59, 130, 246, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .drop-zone i {
+            font-size: 2.5rem;
+            color: var(--text-secondary);
+        }
+
+        .url-input-group {
+            display: flex;
+            width: 100%;
+            max-width: 500px;
+            gap: 0.5rem;
+        }
+
+        input[type="text"], input[type="number"] {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.3s ease;
+            font-family: inherit;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus {
+            border-color: var(--accent-color);
+        }
+
+        button {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        button.secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+        }
+
+        button.secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Cropper Area */
+        .crop-stage {
+            display: none;
+            flex-direction: column;
+            gap: 1rem;
+            height: 100%;
+        }
+
+        .cropper-container-wrapper {
+            flex-grow: 1;
+            min-height: 400px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #image-to-crop {
+            max-width: 100%;
+            display: block;
+        }
+
+        /* Controls Area */
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-item label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .control-item input {
+            width: 100%;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Preview Panel */
+        .preview-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            height: 100%;
+        }
+
+        .preview-box {
+            width: 100%;
+            aspect-ratio: 1/1;
+            background: repeating-conic-gradient(rgba(255, 255, 255, 0.05) 0% 25%, transparent 0% 50%) 50% / 20px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #preview-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .stats {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .stat-row:last-child { margin-bottom: 0; }
+        .stat-label { color: var(--text-secondary); }
+        .stat-value { color: var(--accent-color); font-weight: 600; }
+
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: auto;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        /* Utils */
+        .hidden { display: none !important; }
+
+        /* Customizing Cropper.js */
+        .cropper-view-box,
+        .cropper-face {
+            border-radius: 0;
+        }
+        .cropper-line { background-color: var(--accent-color); }
+        .cropper-point { background-color: var(--accent-color); width: 8px; height: 8px; }
+        .cropper-bg { background-image: none; background-color: #000; }
+
+        /* Toast / Notification */
+        #toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ef4444;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">SOPA // IMAGES</div>
+        <div class="step-indicator">
+            <div class="step active" id="step-1">1. Input</div>
+            <div class="step" id="step-2">2. Process</div>
+            <div class="step" id="step-3">3. Export</div>
+        </div>
+        <button id="reset-btn" class="secondary hidden">Reset</button>
+    </header>
+
+    <main>
+        <!-- Left Panel: Source & Editing -->
+        <section class="panel">
+            <div class="panel-header">
+                <span id="panel-title">Source Image</span>
+                <div class="header-actions">
+                    <!-- Placeholder for extra tools -->
+                </div>
+            </div>
+            
+            <div class="panel-content">
+                <!-- Step 1: Input -->
+                <div id="input-stage" class="input-stage fade-in">
+                    <div class="drop-zone" id="drop-zone">
+                        <i>📂</i>
+                        <div>
+                            <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Drop image here</p>
+                            <p style="color: var(--text-secondary);">or click to browse, or paste (Ctrl+V)</p>
+                        </div>
+                        <input type="file" id="file-input" accept="image/*" class="hidden">
+                    </div>
+                    
+                    <div style="color: var(--text-secondary);">— or —</div>
+                    
+                    <div class="url-input-group">
+                        <input type="text" id="url-input" placeholder="Paste image URL..." style="flex-grow: 1;">
+                        <button id="url-load-btn">Load URL</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Crop/Resize -->
+                <div id="crop-stage" class="crop-stage">
+                    <div class="cropper-container-wrapper">
+                        <img id="image-to-crop" src="" alt="Source">
+                    </div>
+                    
+                    <div class="controls">
+                        <div class="control-item">
+                            <label>Target Width (px)</label>
+                            <input type="number" id="target-width" value="1200">
+                        </div>
+                        <div class="control-item">
+                            <label>Target Height (px)</label>
+                            <input type="number" id="target-height" value="800">
+                        </div>
+                        <div class="control-item">
+                            <label>WebP Quality</label>
+                            <input type="number" id="target-quality" value="85" min="1" max="100">
+                        </div>
+                        <div class="control-item" style="justify-content: flex-end;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none;">
+                                <input type="checkbox" id="aspect-lock" checked style="width: auto;">
+                                Lock Ratio
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Result & Export -->
+        <section class="panel">
+            <div class="panel-header">Preview</div>
+            <div class="panel-content">
+                <div class="preview-container">
+                    <div class="preview-box">
+                        <img id="preview-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Preview">
+                        <div id="preview-placeholder" style="color: var(--text-secondary); text-align: center;">
+                            <p>No image loaded</p>
+                        </div>
+                    </div>
+
+                    <div class="stats">
+                        <div class="stat-row">
+                            <span class="stat-label">Source Size:</span>
+                            <span class="stat-value" id="stat-source-size">-</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Crop Area:</span>
+                            <span class="stat-value" id="stat-crop-area">-</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Export Size:</span>
+                            <span class="stat-value" id="stat-export-size">-</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Est. File Size:</span>
+                            <span class="stat-value" id="stat-file-size">-</span>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button id="export-btn" style="width: 100%; justify-content: center; padding: 1rem; font-size: 1.1rem;" disabled>
+                            Download WebP
+                        </button>
+                        <p style="font-size: 0.7rem; color: var(--text-secondary); text-align: center;">
+                            Processing happens entirely in your browser.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast">Error message goes here</div>
+
+    <!-- Cropper.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+
+    <script>
+        // State
+        let cropper = null;
+        let sourceImg = null;
+        let currentBlob = null;
+        let isProcessing = false;
+
+        // Elements
+        const el = {
+            inputStage: document.getElementById('input-stage'),
+            cropStage: document.getElementById('crop-stage'),
+            dropZone: document.getElementById('drop-zone'),
+            fileInput: document.getElementById('file-input'),
+            urlInput: document.getElementById('url-input'),
+            urlLoadBtn: document.getElementById('url-load-btn'),
+            imgToCrop: document.getElementById('image-to-crop'),
+            previewImg: document.getElementById('preview-img'),
+            previewPlaceholder: document.getElementById('preview-placeholder'),
+            targetWidth: document.getElementById('target-width'),
+            targetHeight: document.getElementById('target-height'),
+            targetQuality: document.getElementById('target-quality'),
+            aspectLock: document.getElementById('aspect-lock'),
+            exportBtn: document.getElementById('export-btn'),
+            resetBtn: document.getElementById('reset-btn'),
+            toast: document.getElementById('toast'),
+            steps: [
+                document.getElementById('step-1'),
+                document.getElementById('step-2'),
+                document.getElementById('step-3')
+            ],
+            stats: {
+                source: document.getElementById('stat-source-size'),
+                crop: document.getElementById('stat-crop-area'),
+                export: document.getElementById('stat-export-size'),
+                file: document.getElementById('stat-file-size')
+            }
+        };
+
+        // --- Initialization ---
+
+        function init() {
+            // Drop zone click
+            el.dropZone.addEventListener('click', () => el.fileInput.click());
+            
+            // File input change
+            el.fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) loadBlob(e.target.files[0]);
+            });
+
+            // URL Load
+            el.urlLoadBtn.addEventListener('click', () => {
+                const url = el.urlInput.value.trim();
+                if (url) loadFromUrl(url);
+            });
+
+            // Clipboard Paste
+            document.addEventListener('paste', (e) => {
+                const item = [...e.clipboardData.items].find(i => i.type.startsWith('image/'));
+                if (item) loadBlob(item.getAsFile());
+            });
+
+            // Drag & Drop
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+                el.dropZone.addEventListener(evt, e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            });
+
+            el.dropZone.addEventListener('dragover', () => el.dropZone.classList.add('dragover'));
+            el.dropZone.addEventListener('dragleave', () => el.dropZone.classList.remove('dragover'));
+            el.dropZone.addEventListener('drop', (e) => {
+                el.dropZone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) loadBlob(file);
+            });
+
+            // Resize Inputs
+            el.targetWidth.addEventListener('input', () => handleResizeInput('width'));
+            el.targetHeight.addEventListener('input', () => handleResizeInput('height'));
+            el.targetQuality.addEventListener('input', updatePreviewDebounced);
+            el.aspectLock.addEventListener('change', () => {
+                if (cropper) {
+                    cropper.setAspectRatio(el.aspectLock.checked ? (el.targetWidth.value / el.targetHeight.value) : NaN);
+                }
+            });
+
+            // Export
+            el.exportBtn.addEventListener('click', exportWebP);
+
+            // Reset
+            el.resetBtn.addEventListener('click', resetApp);
+        }
+
+        // --- Core Logic ---
+
+        async function loadFromUrl(url) {
+            showToast('Loading image from URL...', 2000, '#3b82f6');
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const blob = await response.blob();
+                if (!blob.type.startsWith('image/')) throw new Error('URL is not an image');
+                loadBlob(blob);
+            } catch (err) {
+                console.error(err);
+                showToast('CORS block or invalid URL. Try downloading first.', 4000);
+            }
+        }
+
+        function loadBlob(blob) {
+            currentBlob = blob;
+            const url = URL.createObjectURL(blob);
+            
+            sourceImg = new Image();
+            sourceImg.onload = () => {
+                setupCropper(url);
+                el.stats.source.textContent = `${sourceImg.naturalWidth} x ${sourceImg.naturalHeight} px`;
+            };
+            sourceImg.src = url;
+
+            // Transition UI
+            el.inputStage.classList.add('hidden');
+            el.cropStage.style.display = 'flex';
+            el.resetBtn.classList.remove('hidden');
+            el.exportBtn.disabled = false;
+            updateSteps(1); // Move to Step 2
+        }
+
+        function setupCropper(url) {
+            if (cropper) cropper.destroy();
+            
+            el.imgToCrop.src = url;
+            cropper = new Cropper(el.imgToCrop, {
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 0.8,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: false,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
+                ready() {
+                    // Initial target values
+                    const data = cropper.getData(true);
+                    el.targetWidth.value = data.width;
+                    el.targetHeight.value = data.height;
+                    updatePreview();
+                },
+                crop(event) {
+                    const data = event.detail;
+                    el.stats.crop.textContent = `${Math.round(data.width)} x ${Math.round(data.height)} px`;
+                    
+                    // Update width/height inputs if they aren't the source of the change
+                    if (!isProcessing) {
+                        el.targetWidth.value = Math.round(data.width);
+                        el.targetHeight.value = Math.round(data.height);
+                    }
+                    updatePreviewDebounced();
+                }
+            });
+        }
+
+        function handleResizeInput(source) {
+            if (!cropper || isProcessing) return;
+            
+            const w = parseInt(el.targetWidth.value) || 1;
+            const h = parseInt(el.targetHeight.value) || 1;
+            const data = cropper.getData(true);
+            const ratio = data.width / data.height;
+
+            if (el.aspectLock.checked) {
+                if (source === 'width') {
+                    el.targetHeight.value = Math.round(w / ratio);
+                } else {
+                    el.targetWidth.value = Math.round(h * ratio);
+                }
+            }
+            
+            updatePreviewDebounced();
+        }
+
+        let previewTimeout;
+        function updatePreviewDebounced() {
+            clearTimeout(previewTimeout);
+            previewTimeout = setTimeout(updatePreview, 150);
+        }
+
+        function updatePreview() {
+            if (!cropper) return;
+            
+            isProcessing = true;
+            const width = parseInt(el.targetWidth.value) || 1;
+            const height = parseInt(el.targetHeight.value) || 1;
+            const quality = parseInt(el.targetQuality.value) || 85;
+
+            const canvas = cropper.getCroppedCanvas({
+                width: width,
+                height: height,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high',
+            });
+
+            if (!canvas) {
+                isProcessing = false;
+                return;
+            }
+
+            const webpUrl = canvas.toDataURL('image/webp', quality / 100);
+            el.previewImg.src = webpUrl;
+            el.previewPlaceholder.classList.add('hidden');
+            el.previewImg.classList.remove('hidden');
+
+            el.stats.export.textContent = `${width} x ${height} px`;
+            
+            // Estimate size
+            const head = 'data:image/webp;base64,';
+            const size = Math.round((webpUrl.length - head.length) * 3 / 4);
+            el.stats.file.textContent = formatBytes(size);
+            
+            isProcessing = false;
+        }
+
+        async function exportWebP() {
+            if (!cropper) return;
+            
+            const width = parseInt(el.targetWidth.value) || 1;
+            const height = parseInt(el.targetHeight.value) || 1;
+            const quality = parseInt(el.targetQuality.value) || 85;
+
+            updateSteps(2); // Step 3: Exporting
+
+            cropper.getCroppedCanvas({
+                width: width,
+                height: height,
+            }).toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `processed_${Date.now()}.webp`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                showToast('Image exported successfully!', 3000, '#10b981');
+                setTimeout(() => updateSteps(1), 2000);
+            }, 'image/webp', quality / 100);
+        }
+
+        // --- Helpers ---
+
+        function updateSteps(idx) {
+            el.steps.forEach((s, i) => {
+                s.classList.toggle('active', i === idx);
+            });
+        }
+
+        function resetApp() {
+            if (cropper) cropper.destroy();
+            cropper = null;
+            sourceImg = null;
+            currentBlob = null;
+            
+            el.imgToCrop.src = '';
+            el.previewImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+            el.previewPlaceholder.classList.remove('hidden');
+            el.inputStage.classList.remove('hidden');
+            el.cropStage.style.display = 'none';
+            el.resetBtn.classList.add('hidden');
+            el.exportBtn.disabled = true;
+            el.urlInput.value = '';
+            
+            Object.values(el.stats).forEach(s => s.textContent = '-');
+            updateSteps(0);
+        }
+
+        function showToast(msg, duration = 3000, color = '#ef4444') {
+            el.toast.textContent = msg;
+            el.toast.style.backgroundColor = color;
+            el.toast.style.display = 'block';
+            el.toast.classList.add('fade-in');
+            
+            setTimeout(() => {
+                el.toast.style.display = 'none';
+            }, duration);
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // Boot
+        init();
+
+    </script>
+</body>
+</html>

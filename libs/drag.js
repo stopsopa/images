@@ -26,6 +26,21 @@ export default function drag(element, listener, fetch) {
   let down = false;
   let fetchX;
   let fetchY;
+  function mousemove(e) {
+    if (down) {
+      listener(fetchX + e.pageX - pageX, fetchY + e.pageY - pageY, "mousemove");
+    }
+  }
+
+  function mouseup(e) {
+    document.removeEventListener("mousemove", mousemove);
+    document.removeEventListener("mouseup", mouseup);
+    if (down) {
+      down = false;
+      listener(fetchX + e.pageX - pageX, fetchY + e.pageY - pageY, "mouseup");
+    }
+  }
+
   function mousedown(e) {
     down = true;
     pageX = e.pageX;
@@ -36,19 +51,16 @@ export default function drag(element, listener, fetch) {
       fetchX = fetchY = 0;
     }
     listener(fetchX + e.pageX - pageX, fetchY + e.pageY - pageY, "mousedown");
-    function mousemove(e) {
-      if (down) {
-        listener(fetchX + e.pageX - pageX, fetchY + e.pageY - pageY, "mousemove");
-      }
-    }
-    document.addEventListener("mouseup", (e) => {
-      document.removeEventListener("mousemove", mousemove);
-      if (down) {
-        down = false;
-        listener(fetchX + e.pageX - pageX, fetchY + e.pageY - pageY, "mouseup");
-      }
-    });
+
+    document.addEventListener("mouseup", mouseup);
     document.addEventListener("mousemove", mousemove);
   }
+
   element.addEventListener("mousedown", mousedown);
+
+  return function unbind() {
+    element.removeEventListener("mousedown", mousedown);
+    document.removeEventListener("mousemove", mousemove);
+    document.removeEventListener("mouseup", mouseup);
+  };
 }

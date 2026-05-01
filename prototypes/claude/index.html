@@ -55,7 +55,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #444; }
 
         header {
-            padding: 2rem;
+            padding: 10px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -385,12 +385,6 @@
 
     <header>
         <div class="logo">SOPA // IMAGES</div>
-        <div class="step-indicator">
-            <div class="step active" id="step-1">1. Input</div>
-            <div class="step" id="step-2">2. Process</div>
-            <div class="step" id="step-3">3. Export</div>
-        </div>
-        <button id="reset-btn" class="secondary hidden">Reset</button>
     </header>
 
     <main>
@@ -603,14 +597,8 @@
             padLeft: document.getElementById('pad-left'),
             
             exportBtn: document.getElementById('export-btn'),
-            resetBtn: document.getElementById('reset-btn'),
             toast: document.getElementById('toast'),
             floatPreviewBtn: document.getElementById('float-preview-btn'),
-            steps: [
-                document.getElementById('step-1'),
-                document.getElementById('step-2'),
-                document.getElementById('step-3')
-            ],
             stats: {
                 source: document.getElementById('stat-source-size'),
                 crop: document.getElementById('stat-crop-area'),
@@ -677,11 +665,10 @@
             });
 
             el.exportBtn.addEventListener('click', exportImage);
-            el.resetBtn.addEventListener('click', resetApp);
             
             // Float Preview logic
             let isPreviewFloating = false;
-            let dragInitialized = false;
+            let unbindDrag = null;
 
             el.floatPreviewBtn.addEventListener('click', () => {
                 const previewBox = document.querySelector('.preview-box');
@@ -716,9 +703,8 @@
                     previewBox.style.boxShadow = '0 20px 40px rgba(0,0,0,0.8)';
                     previewBox.style.cursor = 'move';
 
-                    if (!dragInitialized) {
-                        dragInitialized = true;
-                        drag(
+                    if (!unbindDrag) {
+                        unbindDrag = drag(
                           previewBox,
                           (x, y) => {
                             previewBox.style.left = `${x}px`;
@@ -733,6 +719,11 @@
                 } else {
                     el.floatPreviewBtn.textContent = 'Float';
                     
+                    if (unbindDrag) {
+                        unbindDrag();
+                        unbindDrag = null;
+                    }
+
                     const placeholder = document.getElementById('preview-box-placeholder');
                     if (placeholder) {
                         placeholder.parentNode.insertBefore(previewBox, placeholder);
@@ -848,9 +839,7 @@
 
             el.inputStage.classList.add('hidden');
             el.cropStage.style.display = 'flex';
-            el.resetBtn.classList.remove('hidden');
             el.exportBtn.disabled = false;
-            updateSteps(1);
         }
 
         function setupCropper(url) {
@@ -1126,8 +1115,6 @@
             const format = document.querySelector('input[name="export-format"]:checked').value;
             const mimeType = `image/${format}`;
             const ext = format === 'jpeg' ? 'jpg' : format;
-            
-            updateSteps(2);
 
             const canvas = createFinalCanvas();
             if (!canvas) return;
@@ -1140,32 +1127,7 @@
                 a.download = `${baseName}.${ext}`;
                 a.click();
                 showToast('Image exported!', 3000, '#10b981');
-                setTimeout(() => updateSteps(1), 2000);
             }, mimeType, quality / 100);
-        }
-
-        function updateSteps(idx) {
-            el.steps.forEach((s, i) => s.classList.toggle('active', i === idx));
-        }
-
-        function resetApp() {
-            if (cropper) cropper.destroy();
-            cropper = null;
-            sourceImg = null;
-            currentBlob = null;
-            isManualDownloadSize = false;
-            
-            el.imgToCrop.src = '';
-            el.previewImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-            el.previewPlaceholder.classList.remove('hidden');
-            el.inputStage.classList.remove('hidden');
-            el.cropStage.style.display = 'none';
-            el.resetBtn.classList.add('hidden');
-            el.exportBtn.disabled = true;
-            el.urlInput.value = '';
-            
-            Object.values(el.stats).forEach(s => s.textContent = '-');
-            updateSteps(0);
         }
 
         function showToast(msg, duration = 3000, color = '#ef4444') {

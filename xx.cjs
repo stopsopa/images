@@ -20,21 +20,13 @@ module.exports = (setup) => {
 set -e  
 # git config core.excludesFile .git/.gitignore_local
 
-# echo -e "\n      Press enter to continue\n"
-# read
 
-# source .env
-# source .env.sh
 export NODE_OPTIONS=""
         
 cat <<EEE
 
   🐙 GitHub: $(git ls-remote --get-url origin | awk '{\$1=\$1};1' | tr -d '\\n' | sed -E 's/git@github\\.com:([^/]+)\\/(.+)\\.git/https:\\/\\/github.com\\/\\1\\/\\2/g')
 
-  arango admin:
-    http://localhost:\${DYNAMO_ADMIN_PORT}
-
--- DEV NOTES --
 
 EEE
 

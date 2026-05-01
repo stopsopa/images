@@ -6,12 +6,11 @@ import { realpathSync } from "node:fs";
 const execAsync = promisify(exec);
 
 /**
- * Executes 'search.sh' and returns its output as an array of strings.
- * Throws an error if the command fails.
+ * node libs/search.ts
  */
 export default async function search(): Promise<string[]> {
   try {
-    const { stdout } = await execAsync("/bin/bash search.sh");
+    const { stdout } = await execAsync("/bin/bash libs/search.sh");
 
     return stdout
       .split("\n")

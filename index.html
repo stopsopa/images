@@ -550,6 +550,8 @@
 
     <script type="module">
         import drag, { getStyle } from './libs/drag.js';
+        import loadWeserv from './libs/fetchProxy/weserv.js';
+        import loadCodetabs from './libs/fetchProxy/codetabs.js';
 
         // State
         let cropper = null;
@@ -815,11 +817,14 @@
         async function loadFromUrl(url) {
             showToast('Loading image from URL...', 2000, '#3b82f6');
             try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const blob = await response.blob();
+                // Use Promise.race to take the fastest successful response from our working proxies
+                const blob = await Promise.race([
+                    loadWeserv(url),
+                    loadCodetabs(url)
+                ]);
                 loadBlob(blob);
             } catch (err) {
+                console.error('Load from URL failed:', err);
                 showToast('CORS block or invalid URL. Try downloading first.', 4000);
             }
         }

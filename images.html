@@ -273,50 +273,81 @@
         /* Popover Styles */
         #image-popover[data-popover] {
             border: none;
-            border-radius: 8px;
-            padding: 12px;
+            border-radius: 12px;
+            padding: 16px;
             background: white;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-            width: 320px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            width: max-content;
+            max-width: 90vw;
         }
 
         #image-popover::backdrop {
-            background: rgba(0, 0, 0, 0.05);
+            background: rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(2px);
         }
 
         .popover-content {
             display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .popover-image {
+            background-image: repeating-conic-gradient(#f1f5f9 0% 25%, #ffffff 0% 50%);
+            background-position: 0 0;
+            background-size: 20px 20px;
+            border-radius: 6px;
+            overflow: hidden;
+            flex-shrink: 0;
+            border: 1px solid #e2e8f0;
+        }
+
+        .popover-image img {
+            display: block;
+            max-height: 300px;
+            max-width: 300px;
+            object-fit: contain;
+        }
+
+        .popover-inputs {
+            display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 15px;
+            flex-grow: 1;
+            min-width: 350px;
         }
 
         .popover-row {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
         }
 
         .popover-row label {
-            font-size: 0.6rem;
+            font-size: 0.65rem;
             font-weight: 800;
             color: #64748b;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .popover-row input {
-            background: #f1f5f9;
+            background: #f8fafc;
             border: 1px solid #e2e8f0;
-            border-radius: 4px;
-            padding: 6px 8px;
-            font-size: 0.75rem;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 0.8rem;
             font-family: 'JetBrains Mono', monospace;
             width: 100%;
             box-sizing: border-box;
             outline: none;
+            color: var(--text-color);
         }
 
         .popover-row input:focus {
             border-color: var(--accent-color);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
         }
 
         #loader {
@@ -423,15 +454,20 @@
     <div id="loader">Discovering images...</div>
     <div class="masonry" id="gallery"></div>
 
-    <div id="image-popover" popover data-popover class="right">
+    <div id="image-popover" popover data-popover class="center">
         <div class="popover-content">
-            <div class="popover-row">
-                <label>Absolute Path</label>
-                <input type="text" id="pop-abs-path" readonly>
+            <div class="popover-image">
+                <img id="pop-img" src="" alt="">
             </div>
-            <div class="popover-row">
-                <label>Markdown Link</label>
-                <input type="text" id="pop-md-link" readonly>
+            <div class="popover-inputs">
+                <div class="popover-row">
+                    <label>Absolute Path</label>
+                    <input type="text" id="pop-abs-path" readonly>
+                </div>
+                <div class="popover-row">
+                    <label>Markdown Link</label>
+                    <input type="text" id="pop-md-link" readonly>
+                </div>
             </div>
         </div>
     </div>
@@ -492,10 +528,13 @@
                     const popover = document.getElementById('image-popover');
                     const absInput = document.getElementById('pop-abs-path');
                     const mdInput = document.getElementById('pop-md-link');
+                    const popImg = document.getElementById('pop-img');
                     
                     const absPath = window.location.origin + '/' + img.path;
                     absInput.value = absPath;
                     mdInput.value = `![${filename}](${absPath})`;
+                    popImg.src = img.path;
+                    popImg.alt = filename;
                     
                     // Chromium 125+ Anchor Positioning
                     item.style.anchorName = '--active-item';

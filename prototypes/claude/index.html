@@ -639,6 +639,74 @@
 
             el.exportBtn.addEventListener('click', exportWebP);
             el.resetBtn.addEventListener('click', resetApp);
+            
+            setupScrubbableInputs();
+        }
+
+        // --- Scrubbable Inputs ---
+        function setupScrubbableInputs() {
+            const numberInputs = document.querySelectorAll('input[type="number"]');
+            
+            numberInputs.forEach(input => {
+                const label = input.parentElement.querySelector('label') || input.closest('.control-item')?.querySelector('label');
+                
+                let isDragging = false;
+                let startX = 0;
+                let startValue = 0;
+
+                const onMouseDown = (e) => {
+                    startX = e.clientX;
+                    startValue = parseFloat(input.value) || 0;
+                    window.addEventListener('mousemove', onMouseMove);
+                    window.addEventListener('mouseup', onMouseUp);
+                };
+
+                const onMouseMove = (e) => {
+                    const dx = e.clientX - startX;
+                    
+                    if (!isDragging && Math.abs(dx) > 2) {
+                        isDragging = true;
+                        document.body.style.cursor = 'ew-resize';
+                        document.body.style.userSelect = 'none';
+                    }
+
+                    if (isDragging) {
+                        e.preventDefault();
+                        const delta = Math.round(dx / 2); // 2 pixels = 1 unit change
+                        let newValue = startValue + delta;
+                        
+                        if (input.hasAttribute('min')) newValue = Math.max(parseFloat(input.min), newValue);
+                        if (input.hasAttribute('max')) newValue = Math.min(parseFloat(input.max), newValue);
+                        
+                        if (input.value != newValue) {
+                            input.value = newValue;
+                            input.dispatchEvent(new Event('input'));
+                        }
+                    }
+                };
+
+                const onMouseUp = () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        document.body.style.cursor = '';
+                        document.body.style.userSelect = '';
+                    }
+                    window.removeEventListener('mousemove', onMouseMove);
+                    window.removeEventListener('mouseup', onMouseUp);
+                };
+
+                if (label) {
+                    label.style.cursor = 'ew-resize';
+                    label.title = "Drag left/right to adjust value";
+                    label.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        onMouseDown(e);
+                    });
+                }
+                
+                input.title = "Drag left/right to adjust value";
+                input.addEventListener('mousedown', onMouseDown);
+            });
         }
 
         // --- Core Logic ---

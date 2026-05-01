@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      sharp:
-        specifier: ^0.34.5
-        version: 0.34.5
     devDependencies:
       '@types/node':
         specifier: ^25.6.0
@@ -18,6 +14,9 @@ importers:
       esbuild:
         specifier: ^0.28.0
         version: 0.28.0
+      sharp:
+        specifier: ^0.34.5
+        version: 0.34.5
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

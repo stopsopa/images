@@ -296,7 +296,7 @@
         .preview-box {
             width: 100%;
             aspect-ratio: 1/1;
-            background: repeating-conic-gradient(rgba(255, 255, 255, 0.05) 0% 25%, transparent 0% 50%) 50% / 20px 20px;
+            background-color: #000;
             border-radius: 8px;
             border: 1px solid var(--border-color);
             display: flex;
@@ -311,6 +311,8 @@
             max-height: 100%;
             object-fit: contain;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            background: repeating-conic-gradient(rgba(255, 255, 255, 0.1) 0% 25%, transparent 0% 50%) 50% / 20px 20px;
+            background-color: #111;
         }
 
         .stats {
@@ -462,10 +464,44 @@
                             <label>Download Height</label>
                             <input type="number" id="download-height" value="800">
                         </div>
-                        <div class="control-item" style="grid-column: span 2;">
-                            <label>WebP Quality</label>
-                            <input type="number" id="download-quality" value="85" min="1" max="100">
+                        <div class="control-item" style="grid-column: span 2; display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
+                            <div style="flex: 1;">
+                                <label>WebP Quality</label>
+                                <input type="number" id="download-quality" value="85" min="1" max="100">
+                            </div>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none; margin-left: 1rem; margin-top: 1rem;">
+                                <input type="checkbox" id="download-lock" checked style="width: auto;">
+                                Keep Ratio
+                            </label>
                         </div>
+                    </div>
+
+                    <div class="controls pad-cross-layout" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-top: 0; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 1rem; margin-bottom: 1rem; border-radius: 8px; align-items: end;">
+                        <div></div>
+                        <div class="control-item" style="align-items: center;">
+                            <label>Top</label>
+                            <input type="number" id="pad-top" value="0" style="text-align: center;">
+                        </div>
+                        <div></div>
+                        
+                        <div class="control-item" style="align-items: center;">
+                            <label>Left</label>
+                            <input type="number" id="pad-left" value="0" style="text-align: center;">
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; text-align: center; margin-bottom: 10px;">
+                            Add<br>Space
+                        </div>
+                        <div class="control-item" style="align-items: center;">
+                            <label>Right</label>
+                            <input type="number" id="pad-right" value="0" style="text-align: center;">
+                        </div>
+                        
+                        <div></div>
+                        <div class="control-item" style="align-items: center;">
+                            <label>Bottom</label>
+                            <input type="number" id="pad-bottom" value="0" style="text-align: center;">
+                        </div>
+                        <div></div>
                     </div>
 
                     <div class="stats">
@@ -506,12 +542,13 @@
         let isProcessing = false;
         let isInternalUpdate = false;
         let isManualDownloadSize = false;
+        let isUpdatingDownloadInputs = false;
         
         let activeAction = null;
         let startRatio = 1;
         let startBox = null;
 
-        // ... (el definition remains same) ...
+        // Elements
         const el = {
             inputStage: document.getElementById('input-stage'),
             cropStage: document.getElementById('crop-stage'),
@@ -529,6 +566,12 @@
             downloadWidth: document.getElementById('download-width'),
             downloadHeight: document.getElementById('download-height'),
             downloadQuality: document.getElementById('download-quality'),
+            downloadLock: document.getElementById('download-lock'),
+            
+            padTop: document.getElementById('pad-top'),
+            padRight: document.getElementById('pad-right'),
+            padBottom: document.getElementById('pad-bottom'),
+            padLeft: document.getElementById('pad-left'),
             
             exportBtn: document.getElementById('export-btn'),
             resetBtn: document.getElementById('reset-btn'),
@@ -581,14 +624,16 @@
             el.cropWidth.addEventListener('input', () => syncCropFromInputs());
             el.cropHeight.addEventListener('input', () => syncCropFromInputs());
 
-            // Download Inputs (Right)
-            el.downloadWidth.addEventListener('input', () => {
-                isManualDownloadSize = true;
-                updatePreviewDebounced();
+            // Padding Inputs (Right)
+            [el.padTop, el.padRight, el.padBottom, el.padLeft].forEach(input => {
+                input.addEventListener('input', syncDownloadInputsFromCropOrPad);
             });
-            el.downloadHeight.addEventListener('input', () => {
-                isManualDownloadSize = true;
-                updatePreviewDebounced();
+
+            // Download Inputs (Right)
+            el.downloadWidth.addEventListener('input', onDownloadWidthChange);
+            el.downloadHeight.addEventListener('input', onDownloadHeightChange);
+            el.downloadLock.addEventListener('change', () => {
+                if (el.downloadLock.checked) onDownloadWidthChange();
             });
             el.downloadQuality.addEventListener('input', updatePreviewDebounced);
 
@@ -667,7 +712,6 @@
                         let w = data.width;
                         let h = data.height;
 
-                        // Maintain ratio based on which dimension changed more relative to its start
                         const dw = Math.abs(w - startBox.width) / startBox.width;
                         const dh = Math.abs(h - startBox.height) / startBox.height;
                         
@@ -681,7 +725,6 @@
                         const right = startBox.x + startBox.width;
                         const bottom = startBox.y + startBox.height;
 
-                        // Anchor the box to the opposite corner
                         if (activeAction === 'nw') {
                             newData.x = right - w;
                             newData.y = bottom - h;
@@ -699,32 +742,20 @@
                         cropper.setData(newData);
                         isInternalUpdate = false;
                         
-                        // Use the updated dimensions for UI
                         el.cropWidth.value = Math.round(w);
                         el.cropHeight.value = Math.round(h);
-                        if (!isManualDownloadSize) {
-                            el.downloadWidth.value = Math.round(w);
-                            el.downloadHeight.value = Math.round(h);
-                        }
+                        syncDownloadInputsFromCropOrPad();
                         el.stats.crop.textContent = `${Math.round(w)} x ${Math.round(h)} px`;
                     } else {
-                        // Normal free resizing or side resizing
                         const data = event.detail;
                         const w = Math.round(data.width);
                         const h = Math.round(data.height);
                         
                         el.cropWidth.value = w;
                         el.cropHeight.value = h;
-                        
-                        if (!isManualDownloadSize) {
-                            el.downloadWidth.value = w;
-                            el.downloadHeight.value = h;
-                        }
-                        
+                        syncDownloadInputsFromCropOrPad();
                         el.stats.crop.textContent = `${w} x ${h} px`;
                     }
-                    
-                    updatePreviewDebounced();
                 }
             });
         }
@@ -736,7 +767,6 @@
             const w = parseFloat(el.cropWidth.value) || 1;
             const h = parseFloat(el.cropHeight.value) || 1;
             
-            // Attempt to keep the selection size close to what was entered
             const data = cropper.getData();
             cropper.setData({
                 width: w,
@@ -745,13 +775,105 @@
                 y: data.y
             });
             
-            if (!isManualDownloadSize) {
-                el.downloadWidth.value = Math.round(w);
-                el.downloadHeight.value = Math.round(h);
-            }
-            
             isInternalUpdate = false;
+            syncDownloadInputsFromCropOrPad();
+        }
+
+        function getPaddedDimensions() {
+            const cw = parseFloat(el.cropWidth.value) || 1;
+            const ch = parseFloat(el.cropHeight.value) || 1;
+            const pt = parseFloat(el.padTop.value) || 0;
+            const pr = parseFloat(el.padRight.value) || 0;
+            const pb = parseFloat(el.padBottom.value) || 0;
+            const pl = parseFloat(el.padLeft.value) || 0;
+            return { w: Math.max(1, cw + pl + pr), h: Math.max(1, ch + pt + pb) };
+        }
+
+        function syncDownloadInputsFromCropOrPad() {
+            if (isUpdatingDownloadInputs) return;
+            const padded = getPaddedDimensions();
+            
+            if (!isManualDownloadSize) {
+                el.downloadWidth.value = Math.round(padded.w);
+                el.downloadHeight.value = Math.round(padded.h);
+            } else if (el.downloadLock.checked) {
+                isUpdatingDownloadInputs = true;
+                const ratio = padded.w / padded.h;
+                el.downloadHeight.value = Math.round((parseFloat(el.downloadWidth.value) || 1) / ratio);
+                isUpdatingDownloadInputs = false;
+            }
             updatePreviewDebounced();
+        }
+
+        function onDownloadWidthChange() {
+            isManualDownloadSize = true;
+            if (isUpdatingDownloadInputs) return;
+            if (el.downloadLock.checked) {
+                isUpdatingDownloadInputs = true;
+                const padded = getPaddedDimensions();
+                const ratio = padded.w / padded.h;
+                el.downloadHeight.value = Math.round((parseFloat(el.downloadWidth.value) || 1) / ratio);
+                isUpdatingDownloadInputs = false;
+            }
+            updatePreviewDebounced();
+        }
+
+        function onDownloadHeightChange() {
+            isManualDownloadSize = true;
+            if (isUpdatingDownloadInputs) return;
+            if (el.downloadLock.checked) {
+                isUpdatingDownloadInputs = true;
+                const padded = getPaddedDimensions();
+                const ratio = padded.w / padded.h;
+                el.downloadWidth.value = Math.round((parseFloat(el.downloadHeight.value) || 1) * ratio);
+                isUpdatingDownloadInputs = false;
+            }
+            updatePreviewDebounced();
+        }
+
+        function createFinalCanvas(scaleToDownload = true) {
+            if (!cropper) return null;
+
+            const cw = Math.max(1, parseFloat(el.cropWidth.value) || 1);
+            const ch = Math.max(1, parseFloat(el.cropHeight.value) || 1);
+
+            const pt = Math.max(0, parseFloat(el.padTop.value) || 0);
+            const pr = Math.max(0, parseFloat(el.padRight.value) || 0);
+            const pb = Math.max(0, parseFloat(el.padBottom.value) || 0);
+            const pl = Math.max(0, parseFloat(el.padLeft.value) || 0);
+
+            const interW = cw + pl + pr;
+            const interH = ch + pt + pb;
+
+            const cropCanvas = cropper.getCroppedCanvas();
+            if (!cropCanvas) return null;
+
+            const interCanvas = document.createElement('canvas');
+            interCanvas.width = interW;
+            interCanvas.height = interH;
+            const interCtx = interCanvas.getContext('2d');
+            
+            // Draw crop in the padded canvas (transparent background)
+            interCtx.drawImage(cropCanvas, 0, 0, cropCanvas.width, cropCanvas.height, pl, pt, cw, ch);
+
+            if (!scaleToDownload) return interCanvas;
+
+            const dw = Math.max(1, parseInt(el.downloadWidth.value) || 1);
+            const dh = Math.max(1, parseInt(el.downloadHeight.value) || 1);
+
+            if (interW === dw && interH === dh) {
+                return interCanvas;
+            }
+
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = dw;
+            finalCanvas.height = dh;
+            const finalCtx = finalCanvas.getContext('2d');
+            finalCtx.imageSmoothingEnabled = true;
+            finalCtx.imageSmoothingQuality = 'high';
+
+            finalCtx.drawImage(interCanvas, 0, 0, dw, dh);
+            return finalCanvas;
         }
 
         let previewTimeout;
@@ -764,16 +886,8 @@
             if (!cropper || isProcessing) return;
             
             isProcessing = true;
-            const dw = parseInt(el.downloadWidth.value) || 1;
-            const dh = parseInt(el.downloadHeight.value) || 1;
             const quality = parseInt(el.downloadQuality.value) || 85;
-
-            const canvas = cropper.getCroppedCanvas({
-                width: dw,
-                height: dh,
-                imageSmoothingEnabled: true,
-                imageSmoothingQuality: 'high',
-            });
+            const canvas = createFinalCanvas();
 
             if (!canvas) {
                 isProcessing = false;
@@ -795,16 +909,13 @@
         async function exportWebP() {
             if (!cropper) return;
             
-            const dw = parseInt(el.downloadWidth.value) || 1;
-            const dh = parseInt(el.downloadHeight.value) || 1;
             const quality = parseInt(el.downloadQuality.value) || 85;
-
             updateSteps(2);
 
-            cropper.getCroppedCanvas({
-                width: dw,
-                height: dh,
-            }).toBlob((blob) => {
+            const canvas = createFinalCanvas();
+            if (!canvas) return;
+
+            canvas.toBlob((blob) => {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;

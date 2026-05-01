@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Proxy Tester</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #0a0a0c;
+            color: #f8fafc;
+        }
+        .form-group { margin-bottom: 1rem; }
+        input[type="text"] {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        .radio-group {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            display: flex;
+            gap: 1.5rem;
+            opacity: 0.5;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .radio-group.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        label.radio-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        button {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            width: 100%;
+            font-weight: 600;
+        }
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+        .error {
+            color: #ef4444;
+            margin-top: 1rem;
+            font-weight: 600;
+        }
+        .success {
+            color: #10b981;
+            margin-top: 1rem;
+            font-weight: 600;
+        }
+        canvas {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 1rem;
+            max-width: 100%;
+            border-radius: 8px;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>CORS Proxy Tester</h1>
+    
+    <div class="form-group">
+        <label for="url" style="display:block; margin-bottom: 0.5rem;">Image URL:</label>
+        <input type="text" id="url" placeholder="https://example.com/image.jpg">
+    </div>
+
+    <div class="radio-group" id="radios">
+        <label class="radio-label">
+            <input type="radio" name="proxy" value="corsproxy.io" checked> corsproxy.io
+        </label>
+        <label class="radio-label">
+            <input type="radio" name="proxy" value="codetabs.com"> codetabs.com
+        </label>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; width: 100%;">
+        <button id="load-btn" style="flex-grow: 1;" disabled>Load Image</button>
+        <button id="clear-btn" style="width: auto; padding-left: 1.5rem; padding-right: 1.5rem; background: #475569;" title="Clear Canvas">X</button>
+    </div>
+
+    <div id="status-msg"></div>
+    <canvas id="canvas" width="0" height="0"></canvas>
+
+    <script type="module">
+        import loadCorsproxyIo from './libs/fetchProxy/corsproxy.io.js';
+        import loadCodetabsCom from './libs/fetchProxy/codetabs.com.js';
+
+        const proxies = {
+            'corsproxy.io': loadCorsproxyIo,
+            'codetabs.com': loadCodetabsCom
+        };
+
+        const urlInput = document.getElementById('url');
+        const radiosDiv = document.getElementById('radios');
+        const loadBtn = document.getElementById('load-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const statusMsg = document.getElementById('status-msg');
+
+        urlInput.addEventListener('input', () => {
+            if (urlInput.value.trim().length > 0) {
+                radiosDiv.classList.add('active');
+                loadBtn.disabled = false;
+            } else {
+                radiosDiv.classList.remove('active');
+                loadBtn.disabled = true;
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            canvas.width = 0;
+            canvas.height = 0;
+            statusMsg.textContent = '';
+        });
+
+        loadBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            const selectedProxy = document.querySelector('input[name="proxy"]:checked').value;
+            const loader = proxies[selectedProxy];
+            
+            statusMsg.className = '';
+            statusMsg.textContent = `Loading via ${selectedProxy}...`;
+            loadBtn.disabled = true;
+            
+            // Clear canvas
+            canvas.width = 0;
+            canvas.height = 0;
+
+            try {
+                const blob = await loader(url);
+                const objectUrl = URL.createObjectURL(blob);
+                
+                const img = new Image();
+                img.onload = () => {
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    statusMsg.className = 'success';
+                    statusMsg.textContent = `Successfully loaded via ${selectedProxy}!`;
+                    URL.revokeObjectURL(objectUrl);
+                    loadBtn.disabled = false;
+                };
+                img.onerror = () => {
+                    statusMsg.className = 'error';
+                    statusMsg.textContent = 'Failed to decode image data after fetching.';
+                    loadBtn.disabled = false;
+                };
+                img.src = objectUrl;
+                
+            } catch (err) {
+                statusMsg.className = 'error';
+                statusMsg.textContent = err.message || String(err);
+                loadBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

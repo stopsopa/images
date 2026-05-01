@@ -52,6 +52,35 @@ export PPORT="5090" && echo -e "\n    http://localhost:\${PPORT} \n" && python3 
       source: false,
       confirm: false,
     },
+    build: {
+      command: `
+set -e  
+/bin/bash build.sh
+      `,
+      description: "Build the extension",
+      source: false,
+      confirm: false,
+    },
+    tsc: {
+      command: `
+set -e  
+NODE_OPTIONS="" node_modules/.bin/tsc
+
+      `,
+      description: "Transpile all .ts files",
+      source: false,
+      confirm: false,
+    },
+    transpile: {
+      command: `
+set -e  
+find . -path './node_modules' -prune -o -path './.git' -prune -o -type f -name '*.ts' -print | NODE_OPTIONS="" node gitignore.js .myignore | NODE_OPTIONS="" node es.ts
+
+      `,
+      description: "Transpile all .ts files",
+      source: false,
+      confirm: false,
+    },
 
     ...setup,
   };

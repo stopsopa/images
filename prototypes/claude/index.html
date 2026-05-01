@@ -429,22 +429,12 @@
                     
                     <div class="controls">
                         <div class="control-item">
-                            <label>Target Width (px)</label>
-                            <input type="number" id="target-width" value="1200">
+                            <label>Crop Width (px)</label>
+                            <input type="number" id="crop-width" value="1200">
                         </div>
                         <div class="control-item">
-                            <label>Target Height (px)</label>
-                            <input type="number" id="target-height" value="800">
-                        </div>
-                        <div class="control-item">
-                            <label>WebP Quality</label>
-                            <input type="number" id="target-quality" value="85" min="1" max="100">
-                        </div>
-                        <div class="control-item" style="justify-content: flex-end;">
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none;">
-                                <input type="checkbox" id="aspect-lock" checked style="width: auto;">
-                                Lock Ratio
-                            </label>
+                            <label>Crop Height (px)</label>
+                            <input type="number" id="crop-height" value="800">
                         </div>
                     </div>
                 </div>
@@ -453,7 +443,7 @@
 
         <!-- Right Panel: Result & Export -->
         <section class="panel">
-            <div class="panel-header">Preview</div>
+            <div class="panel-header">Preview & Export</div>
             <div class="panel-content">
                 <div class="preview-container">
                     <div class="preview-box">
@@ -463,18 +453,29 @@
                         </div>
                     </div>
 
+                    <div class="controls" style="grid-template-columns: 1fr 1fr; margin-top: 0; background: none; border: none; padding: 0;">
+                        <div class="control-item">
+                            <label>Download Width</label>
+                            <input type="number" id="download-width" value="1200">
+                        </div>
+                        <div class="control-item">
+                            <label>Download Height</label>
+                            <input type="number" id="download-height" value="800">
+                        </div>
+                        <div class="control-item" style="grid-column: span 2;">
+                            <label>WebP Quality</label>
+                            <input type="number" id="download-quality" value="85" min="1" max="100">
+                        </div>
+                    </div>
+
                     <div class="stats">
                         <div class="stat-row">
-                            <span class="stat-label">Source Size:</span>
+                            <span class="stat-label">Source:</span>
                             <span class="stat-value" id="stat-source-size">-</span>
                         </div>
                         <div class="stat-row">
-                            <span class="stat-label">Crop Area:</span>
+                            <span class="stat-label">Crop:</span>
                             <span class="stat-value" id="stat-crop-area">-</span>
-                        </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Export Size:</span>
-                            <span class="stat-value" id="stat-export-size">-</span>
                         </div>
                         <div class="stat-row">
                             <span class="stat-label">Est. File Size:</span>
@@ -486,9 +487,6 @@
                         <button id="export-btn" style="width: 100%; justify-content: center; padding: 1rem; font-size: 1.1rem;" disabled>
                             Download WebP
                         </button>
-                        <p style="font-size: 0.7rem; color: var(--text-secondary); text-align: center;">
-                            Processing happens entirely in your browser.
-                        </p>
                     </div>
                 </div>
             </div>
@@ -506,8 +504,14 @@
         let sourceImg = null;
         let currentBlob = null;
         let isProcessing = false;
+        let isInternalUpdate = false;
+        let isManualDownloadSize = false;
+        
+        let activeAction = null;
+        let startRatio = 1;
+        let startBox = null;
 
-        // Elements
+        // ... (el definition remains same) ...
         const el = {
             inputStage: document.getElementById('input-stage'),
             cropStage: document.getElementById('crop-stage'),
@@ -518,10 +522,14 @@
             imgToCrop: document.getElementById('image-to-crop'),
             previewImg: document.getElementById('preview-img'),
             previewPlaceholder: document.getElementById('preview-placeholder'),
-            targetWidth: document.getElementById('target-width'),
-            targetHeight: document.getElementById('target-height'),
-            targetQuality: document.getElementById('target-quality'),
-            aspectLock: document.getElementById('aspect-lock'),
+            
+            cropWidth: document.getElementById('crop-width'),
+            cropHeight: document.getElementById('crop-height'),
+            
+            downloadWidth: document.getElementById('download-width'),
+            downloadHeight: document.getElementById('download-height'),
+            downloadQuality: document.getElementById('download-quality'),
+            
             exportBtn: document.getElementById('export-btn'),
             resetBtn: document.getElementById('reset-btn'),
             toast: document.getElementById('toast'),
@@ -533,7 +541,6 @@
             stats: {
                 source: document.getElementById('stat-source-size'),
                 crop: document.getElementById('stat-crop-area'),
-                export: document.getElementById('stat-export-size'),
                 file: document.getElementById('stat-file-size')
             }
         };
@@ -541,31 +548,24 @@
         // --- Initialization ---
 
         function init() {
-            // Drop zone click
             el.dropZone.addEventListener('click', () => el.fileInput.click());
-            
-            // File input change
             el.fileInput.addEventListener('change', (e) => {
                 if (e.target.files.length) loadBlob(e.target.files[0]);
             });
 
-            // URL Load
             el.urlLoadBtn.addEventListener('click', () => {
                 const url = el.urlInput.value.trim();
                 if (url) loadFromUrl(url);
             });
 
-            // Clipboard Paste
             document.addEventListener('paste', (e) => {
                 const item = [...e.clipboardData.items].find(i => i.type.startsWith('image/'));
                 if (item) loadBlob(item.getAsFile());
             });
 
-            // Drag & Drop
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
                 el.dropZone.addEventListener(evt, e => {
-                    e.preventDefault();
-                    e.stopPropagation();
+                    e.preventDefault(); e.stopPropagation();
                 });
             });
 
@@ -577,20 +577,22 @@
                 if (file && file.type.startsWith('image/')) loadBlob(file);
             });
 
-            // Resize Inputs
-            el.targetWidth.addEventListener('input', () => handleResizeInput('width'));
-            el.targetHeight.addEventListener('input', () => handleResizeInput('height'));
-            el.targetQuality.addEventListener('input', updatePreviewDebounced);
-            el.aspectLock.addEventListener('change', () => {
-                if (cropper) {
-                    cropper.setAspectRatio(el.aspectLock.checked ? (el.targetWidth.value / el.targetHeight.value) : NaN);
-                }
+            // Crop Inputs (Left)
+            el.cropWidth.addEventListener('input', () => syncCropFromInputs());
+            el.cropHeight.addEventListener('input', () => syncCropFromInputs());
+
+            // Download Inputs (Right)
+            el.downloadWidth.addEventListener('input', () => {
+                isManualDownloadSize = true;
+                updatePreviewDebounced();
             });
+            el.downloadHeight.addEventListener('input', () => {
+                isManualDownloadSize = true;
+                updatePreviewDebounced();
+            });
+            el.downloadQuality.addEventListener('input', updatePreviewDebounced);
 
-            // Export
             el.exportBtn.addEventListener('click', exportWebP);
-
-            // Reset
             el.resetBtn.addEventListener('click', resetApp);
         }
 
@@ -602,10 +604,8 @@
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('Network response was not ok');
                 const blob = await response.blob();
-                if (!blob.type.startsWith('image/')) throw new Error('URL is not an image');
                 loadBlob(blob);
             } catch (err) {
-                console.error(err);
                 showToast('CORS block or invalid URL. Try downloading first.', 4000);
             }
         }
@@ -613,7 +613,6 @@
         function loadBlob(blob) {
             currentBlob = blob;
             const url = URL.createObjectURL(blob);
-            
             sourceImg = new Image();
             sourceImg.onload = () => {
                 setupCropper(url);
@@ -621,16 +620,16 @@
             };
             sourceImg.src = url;
 
-            // Transition UI
             el.inputStage.classList.add('hidden');
             el.cropStage.style.display = 'flex';
             el.resetBtn.classList.remove('hidden');
             el.exportBtn.disabled = false;
-            updateSteps(1); // Move to Step 2
+            updateSteps(1);
         }
 
         function setupCropper(url) {
             if (cropper) cropper.destroy();
+            isManualDownloadSize = false;
             
             el.imgToCrop.src = url;
             cropper = new Cropper(el.imgToCrop, {
@@ -645,62 +644,133 @@
                 cropBoxResizable: true,
                 toggleDragModeOnDblclick: false,
                 ready() {
-                    // Initial target values
-                    const data = cropper.getData(true);
-                    el.targetWidth.value = data.width;
-                    el.targetHeight.value = data.height;
                     updatePreview();
                 },
-                crop(event) {
-                    const data = event.detail;
-                    el.stats.crop.textContent = `${Math.round(data.width)} x ${Math.round(data.height)} px`;
+                cropstart(event) {
+                    activeAction = event.detail.action;
+                    const corners = ['nw', 'ne', 'sw', 'se'];
                     
-                    // Update width/height inputs if they aren't the source of the change
-                    if (!isProcessing) {
-                        el.targetWidth.value = Math.round(data.width);
-                        el.targetHeight.value = Math.round(data.height);
+                    if (corners.includes(activeAction)) {
+                        startBox = cropper.getData();
+                        startRatio = startBox.width / startBox.height;
+                    } else {
+                        startBox = null;
                     }
+                },
+                crop(event) {
+                    if (isInternalUpdate) return;
+                    
+                    const corners = ['nw', 'ne', 'sw', 'se'];
+                    if (corners.includes(activeAction) && startBox) {
+                        isInternalUpdate = true;
+                        const data = event.detail;
+                        let w = data.width;
+                        let h = data.height;
+
+                        // Maintain ratio based on which dimension changed more relative to its start
+                        const dw = Math.abs(w - startBox.width) / startBox.width;
+                        const dh = Math.abs(h - startBox.height) / startBox.height;
+                        
+                        if (dw > dh) {
+                            h = w / startRatio;
+                        } else {
+                            w = h * startRatio;
+                        }
+
+                        const newData = { width: w, height: h };
+                        const right = startBox.x + startBox.width;
+                        const bottom = startBox.y + startBox.height;
+
+                        // Anchor the box to the opposite corner
+                        if (activeAction === 'nw') {
+                            newData.x = right - w;
+                            newData.y = bottom - h;
+                        } else if (activeAction === 'ne') {
+                            newData.x = startBox.x;
+                            newData.y = bottom - h;
+                        } else if (activeAction === 'sw') {
+                            newData.x = right - w;
+                            newData.y = startBox.y;
+                        } else if (activeAction === 'se') {
+                            newData.x = startBox.x;
+                            newData.y = startBox.y;
+                        }
+
+                        cropper.setData(newData);
+                        isInternalUpdate = false;
+                        
+                        // Use the updated dimensions for UI
+                        el.cropWidth.value = Math.round(w);
+                        el.cropHeight.value = Math.round(h);
+                        if (!isManualDownloadSize) {
+                            el.downloadWidth.value = Math.round(w);
+                            el.downloadHeight.value = Math.round(h);
+                        }
+                        el.stats.crop.textContent = `${Math.round(w)} x ${Math.round(h)} px`;
+                    } else {
+                        // Normal free resizing or side resizing
+                        const data = event.detail;
+                        const w = Math.round(data.width);
+                        const h = Math.round(data.height);
+                        
+                        el.cropWidth.value = w;
+                        el.cropHeight.value = h;
+                        
+                        if (!isManualDownloadSize) {
+                            el.downloadWidth.value = w;
+                            el.downloadHeight.value = h;
+                        }
+                        
+                        el.stats.crop.textContent = `${w} x ${h} px`;
+                    }
+                    
                     updatePreviewDebounced();
                 }
             });
         }
 
-        function handleResizeInput(source) {
-            if (!cropper || isProcessing) return;
+        function syncCropFromInputs() {
+            if (!cropper || isInternalUpdate) return;
+            isInternalUpdate = true;
             
-            const w = parseInt(el.targetWidth.value) || 1;
-            const h = parseInt(el.targetHeight.value) || 1;
-            const data = cropper.getData(true);
-            const ratio = data.width / data.height;
-
-            if (el.aspectLock.checked) {
-                if (source === 'width') {
-                    el.targetHeight.value = Math.round(w / ratio);
-                } else {
-                    el.targetWidth.value = Math.round(h * ratio);
-                }
+            const w = parseFloat(el.cropWidth.value) || 1;
+            const h = parseFloat(el.cropHeight.value) || 1;
+            
+            // Attempt to keep the selection size close to what was entered
+            const data = cropper.getData();
+            cropper.setData({
+                width: w,
+                height: h,
+                x: data.x,
+                y: data.y
+            });
+            
+            if (!isManualDownloadSize) {
+                el.downloadWidth.value = Math.round(w);
+                el.downloadHeight.value = Math.round(h);
             }
             
+            isInternalUpdate = false;
             updatePreviewDebounced();
         }
 
         let previewTimeout;
         function updatePreviewDebounced() {
             clearTimeout(previewTimeout);
-            previewTimeout = setTimeout(updatePreview, 150);
+            previewTimeout = setTimeout(updatePreview, 100);
         }
 
         function updatePreview() {
-            if (!cropper) return;
+            if (!cropper || isProcessing) return;
             
             isProcessing = true;
-            const width = parseInt(el.targetWidth.value) || 1;
-            const height = parseInt(el.targetHeight.value) || 1;
-            const quality = parseInt(el.targetQuality.value) || 85;
+            const dw = parseInt(el.downloadWidth.value) || 1;
+            const dh = parseInt(el.downloadHeight.value) || 1;
+            const quality = parseInt(el.downloadQuality.value) || 85;
 
             const canvas = cropper.getCroppedCanvas({
-                width: width,
-                height: height,
+                width: dw,
+                height: dh,
                 imageSmoothingEnabled: true,
                 imageSmoothingQuality: 'high',
             });
@@ -710,53 +780,43 @@
                 return;
             }
 
-            const webpUrl = canvas.toDataURL('image/webp', quality / 100);
-            el.previewImg.src = webpUrl;
-            el.previewPlaceholder.classList.add('hidden');
-            el.previewImg.classList.remove('hidden');
-
-            el.stats.export.textContent = `${width} x ${height} px`;
-            
-            // Estimate size
-            const head = 'data:image/webp;base64,';
-            const size = Math.round((webpUrl.length - head.length) * 3 / 4);
-            el.stats.file.textContent = formatBytes(size);
-            
-            isProcessing = false;
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const webpUrl = URL.createObjectURL(blob);
+                    el.previewImg.src = webpUrl;
+                    el.previewPlaceholder.classList.add('hidden');
+                    el.previewImg.classList.remove('hidden');
+                    el.stats.file.textContent = formatBytes(blob.size);
+                }
+                isProcessing = false;
+            }, 'image/webp', quality / 100);
         }
 
         async function exportWebP() {
             if (!cropper) return;
             
-            const width = parseInt(el.targetWidth.value) || 1;
-            const height = parseInt(el.targetHeight.value) || 1;
-            const quality = parseInt(el.targetQuality.value) || 85;
+            const dw = parseInt(el.downloadWidth.value) || 1;
+            const dh = parseInt(el.downloadHeight.value) || 1;
+            const quality = parseInt(el.downloadQuality.value) || 85;
 
-            updateSteps(2); // Step 3: Exporting
+            updateSteps(2);
 
             cropper.getCroppedCanvas({
-                width: width,
-                height: height,
+                width: dw,
+                height: dh,
             }).toBlob((blob) => {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `processed_${Date.now()}.webp`;
-                document.body.appendChild(a);
                 a.click();
-                document.body.removeChild(a);
-                
-                showToast('Image exported successfully!', 3000, '#10b981');
+                showToast('Image exported!', 3000, '#10b981');
                 setTimeout(() => updateSteps(1), 2000);
             }, 'image/webp', quality / 100);
         }
 
-        // --- Helpers ---
-
         function updateSteps(idx) {
-            el.steps.forEach((s, i) => {
-                s.classList.toggle('active', i === idx);
-            });
+            el.steps.forEach((s, i) => s.classList.toggle('active', i === idx));
         }
 
         function resetApp() {
@@ -764,6 +824,7 @@
             cropper = null;
             sourceImg = null;
             currentBlob = null;
+            isManualDownloadSize = false;
             
             el.imgToCrop.src = '';
             el.previewImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -782,11 +843,7 @@
             el.toast.textContent = msg;
             el.toast.style.backgroundColor = color;
             el.toast.style.display = 'block';
-            el.toast.classList.add('fade-in');
-            
-            setTimeout(() => {
-                el.toast.style.display = 'none';
-            }, duration);
+            setTimeout(() => el.toast.style.display = 'none', duration);
         }
 
         function formatBytes(bytes, decimals = 2) {
@@ -798,9 +855,7 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         }
 
-        // Boot
         init();
-
     </script>
 </body>
 </html>

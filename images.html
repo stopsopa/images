@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Gallery - Masonry Layout</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f1f5f9;
+            --accent-color: #38bdf8;
+            --gap: 1.5rem;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        h1 {
+            text-align: center;
+            font-weight: 800;
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.025em;
+        }
+
+        /* Masonry Layout Technique - CSS Multi-column */
+        .masonry {
+            column-count: 1;
+            column-gap: var(--gap);
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        @media (min-width: 640px) { .masonry { column-count: 2; } }
+        @media (min-width: 1024px) { .masonry { column-count: 3; } }
+        @media (min-width: 1280px) { .masonry { column-count: 4; } }
+
+        .item {
+            display: inline-block;
+            width: 100%;
+            margin-bottom: var(--gap);
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            break-inside: avoid; /* Essential for masonry columns */
+        }
+
+        .item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            border-color: rgba(56, 189, 248, 0.3);
+        }
+
+        .item img {
+            width: 100%;
+            display: block;
+            height: auto;
+            background: #000;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .item .info {
+            padding: 1.25rem;
+        }
+
+        .item .filename {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-color);
+            word-break: break-all;
+            margin-bottom: 0.75rem;
+            line-height: 1.25;
+        }
+
+        .item .meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        .badge {
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent-color);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-weight: 500;
+        }
+
+        #loader {
+            text-align: center;
+            padding: 4rem;
+            color: #94a3b8;
+            font-size: 1.125rem;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem;
+            grid-column: 1 / -1;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Image Assets</h1>
+
+    <div id="loader">Discovering images...</div>
+    <div class="masonry" id="gallery"></div>
+
+    <script type="module">
+        import toHumanReadable from './libs/toHumanReadable.js';
+
+        async function streamToString(stream) {
+            const reader = stream.getReader();
+            const textDecoder = new TextDecoder();
+            let result = '';
+
+            async function read() {
+                const { done, value } = await reader.read();
+
+                if (done) {
+                    return result;
+                }
+
+                result += textDecoder.decode(value, { stream: true });
+                return read();
+            }
+
+            return await read();
+        }
+
+        async function loadImages() {
+            const gallery = document.getElementById('gallery');
+            const loader = document.getElementById('loader');
+
+            try {
+                const response = await fetch('process.json');
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch process.json: ${response.status} ${response.statusText}`);
+                }
+
+                let body = response.body;
+                
+                // Use the user's requested technique for ReadableStream
+                if (Object.prototype.toString.call(body) === '[object ReadableStream]') {
+                    body = await streamToString(body);
+                }
+
+                const lines = body.split('\n').filter(line => line.trim());
+                
+                loader.style.display = 'none';
+
+                if (lines.length === 0) {
+                    gallery.innerHTML = '<div class="empty-state">No images found. Run process.ts first.</div>';
+                    return;
+                }
+
+                for (const line of lines) {
+                    try {
+                        const [path, size, width, height] = JSON.parse(line);
+                        
+                        const item = document.createElement('div');
+                        item.className = 'item';
+                        
+                        // Extract filename from path
+                        const filename = path.split('/').pop();
+                        
+                        item.innerHTML = `
+                            <img src="${path}" alt="${filename}" loading="lazy">
+                            <div class="info">
+                                <div class="filename">${filename}</div>
+                                <div class="meta">
+                                    <span>${width} × ${height} px</span>
+                                    <span class="badge">${toHumanReadable(size)}</span>
+                                </div>
+                            </div>
+                        `;
+                        
+                        gallery.appendChild(item);
+                    } catch (e) {
+                        console.error('Error parsing line:', line, e);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading gallery:', error);
+                loader.style.animation = 'none';
+                loader.innerHTML = `
+                    <div style="color: #ef4444; margin-bottom: 1rem;">Failed to load assets</div>
+                    <div style="font-size: 0.875rem;">Make sure process.json exists and is valid.</div>
+                    <div style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.7;">${error.message}</div>
+                `;
+            }
+        }
+
+        loadImages();
+    </script>
+</body>
+</html>

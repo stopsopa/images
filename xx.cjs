@@ -27,7 +27,6 @@ cat <<EEE
 
   🐙 GitHub: $(git ls-remote --get-url origin | awk '{\$1=\$1};1' | tr -d '\\n' | sed -E 's/git@github\\.com:([^/]+)\\/(.+)\\.git/https:\\/\\/github.com\\/\\1\\/\\2/g')
 
-
 EEE
 
       `,
@@ -66,7 +65,8 @@ NODE_OPTIONS="" node_modules/.bin/tsc
     transpile: {
       command: `
 set -e  
-find . -path './node_modules' -prune -o -path './.git' -prune -o -type f -name '*.ts' -print | NODE_OPTIONS="" node gitignore.js .myignore | NODE_OPTIONS="" node es.ts
+export NODE_OPTIONS="";
+find images -path './node_modules' -prune -o -path './.git' -prune -o -type f -name '*.ts' -print | node gitignore.js .myignore | node es.ts
 
       `,
       description: "Transpile all .ts files",

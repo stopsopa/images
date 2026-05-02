@@ -381,7 +381,6 @@
       #preview-img {
         max-width: 100%;
         max-height: 100%;
-        object-fit: contain;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
         background: repeating-conic-gradient(
             rgba(255, 255, 255, 0.1) 0% 25%,
@@ -1595,6 +1594,21 @@
             if (blob) {
               const url = URL.createObjectURL(blob);
               el.previewImg.src = url;
+
+              const parentRect = el.previewImg.parentElement.getBoundingClientRect();
+              const parentRatio = parentRect.height > 0 ? (parentRect.width / parentRect.height) : 1;
+              const imgRatio = canvas.height > 0 ? (canvas.width / canvas.height) : 1;
+
+              console.log('el.previewImg bbb', el.previewImg)
+              if (imgRatio > parentRatio) {
+              console.log('el.previewImg', el.previewImg)
+                el.previewImg.style.width = "100%";
+                el.previewImg.style.height = "auto";
+              } else {
+                el.previewImg.style.width = "auto";
+                el.previewImg.style.height = "100%";
+              }
+
               el.previewPlaceholder.classList.add("hidden");
               el.previewImg.classList.remove("hidden");
               el.stats.file.textContent = formatBytes(blob.size);

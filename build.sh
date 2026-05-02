@@ -18,6 +18,4 @@ cat <<EEE
 
 EEE
 
-find images -path './node_modules' -prune -o -path './.git' -prune -o -type f -name '*.ts' -print | \
-  node gitignore.js .myignore | \
-  node es.ts
+find . -path './node_modules' -prune -o -path './.git' -prune -o -type f -name '*.ts' -print | node gitignore.js .myignore | node es.ts

@@ -66,7 +66,7 @@ NODE_OPTIONS="" node_modules/.bin/tsc
       command: `
 set -e  
 export NODE_OPTIONS="";
-find images -path './node_modules' -prune -o -path './.git' -prune -o -type f -name '*.ts' -print | node gitignore.js .myignore | node es.ts
+find . -path './node_modules' -prune -o -path './.git' -prune -o -type f -name '*.ts' -print | node gitignore.js .myignore | node es.ts
 
       `,
       description: "Transpile all .ts files",

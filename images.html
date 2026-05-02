@@ -640,7 +640,7 @@
             const mdMirror = document.getElementById("md-mirror");
             const popImg = document.getElementById("pop-img");
 
-            const absPath = window.location.origin + "/" + img.path;
+            const absPath = new URL(img.path, window.location.href).href;
             const mdLink = `![${filename}](${absPath})`;
 
             absInput.value = absPath;

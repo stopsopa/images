@@ -294,6 +294,21 @@
         position: relative;
       }
 
+      .cropper-container-wrapper.bg-bright {
+        background: #ddd !important;
+      }
+      .cropper-container-wrapper.bg-dark {
+        background: #333 !important;
+      }
+      .cropper-container-wrapper.bg-grid {
+        background-image: repeating-conic-gradient(
+            rgba(255, 255, 255, 0.1) 0% 25%,
+            transparent 0% 50%
+          )
+          50% / 20px 20px !important;
+        background-color: #111 !important;
+      }
+
       #image-to-crop {
         max-width: 100%;
         display: block;
@@ -412,6 +427,48 @@
         animation: fadeIn 0.4s ease forwards;
       }
 
+      /* Background Selector */
+      .bg-selector {
+        display: flex;
+        gap: 0.5rem;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 2px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+      }
+      .bg-option {
+        position: relative;
+        cursor: pointer;
+      }
+      .bg-option input {
+        position: absolute;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .bg-option .dot {
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: block;
+        transition: all 0.2s ease;
+      }
+      .bg-option.bright .dot { background: #ddd; }
+      .bg-option.dark .dot { background: #333; }
+      .bg-option.grid .dot {
+        background-image: repeating-conic-gradient(
+            rgba(255, 255, 255, 0.2) 0% 25%,
+            transparent 0% 50%
+          )
+          50% / 6px 6px;
+        background-color: #111;
+      }
+      .bg-option input:checked + .dot {
+        outline: 2px solid var(--accent-color);
+        outline-offset: 1px;
+        transform: scale(0.9);
+      }
+
       /* Utils */
       .hidden {
         display: none !important;
@@ -430,9 +487,10 @@
         width: 8px;
         height: 8px;
       }
+      .cropper-container,
       .cropper-bg {
-        background-image: none;
-        background-color: #000;
+        background-image: none !important;
+        background-color: transparent !important;
       }
 
       /* Toast / Notification */
@@ -475,7 +533,20 @@
         <div class="panel-header">
           <span id="panel-title">Source Image</span>
           <div class="header-actions">
-            <!-- Placeholder for extra tools -->
+            <div class="bg-selector" title="Change background">
+              <label class="bg-option bright" title="Bright Gray">
+                <input type="radio" name="bg-type" value="bg-bright" />
+                <span class="dot"></span>
+              </label>
+              <label class="bg-option dark" title="Dark Gray">
+                <input type="radio" name="bg-type" value="bg-dark" />
+                <span class="dot"></span>
+              </label>
+              <label class="bg-option grid" title="Photoshop Grid">
+                <input type="radio" name="bg-type" value="bg-grid" checked />
+                <span class="dot"></span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -521,7 +592,7 @@
 
           <!-- Step 2: Crop/Resize -->
           <div id="crop-stage" class="crop-stage">
-            <div class="cropper-container-wrapper">
+            <div class="cropper-container-wrapper bg-grid">
               <img id="image-to-crop" src="" alt="Source" />
             </div>
 
@@ -914,6 +985,8 @@
           crop: document.getElementById("stat-crop-area"),
           file: document.getElementById("stat-file-size"),
         },
+        bgRadios: document.querySelectorAll('input[name="bg-type"]'),
+        cropperWrapper: document.querySelector(".cropper-container-wrapper"),
       };
 
       // --- Initialization ---
@@ -927,6 +1000,14 @@
         el.urlLoadBtn.addEventListener("click", () => {
           const url = el.urlInput.value.trim();
           if (url) loadFromUrl(url);
+        });
+
+        // Background Selector logic
+        el.bgRadios.forEach((radio) => {
+          radio.addEventListener("change", (e) => {
+            el.cropperWrapper.classList.remove("bg-bright", "bg-dark", "bg-grid");
+            el.cropperWrapper.classList.add(e.target.value);
+          });
         });
 
         document.addEventListener("paste", (e) => {

@@ -1098,8 +1098,10 @@
               const delta = Math.round(dx / 2); // 2 pixels = 1 unit change
               let newValue = startValue + delta;
 
-              if (input.hasAttribute("min"))
-                newValue = Math.max(parseFloat(input.min), newValue);
+              // Ensure no negative values unless explicitly allowed by min attribute (but user said "Don't allow negative values")
+              const min = input.hasAttribute("min") ? Math.max(0, parseFloat(input.min)) : 0;
+              newValue = Math.max(min, newValue);
+
               if (input.hasAttribute("max"))
                 newValue = Math.min(parseFloat(input.max), newValue);
 
@@ -1130,7 +1132,11 @@
           }
 
           input.title = "Drag left/right to adjust value";
-          input.addEventListener("mousedown", onMouseDown);
+          input.addEventListener("mousedown", (e) => {
+            if (e.target === document.activeElement) return;
+            onMouseDown(e);
+          });
+          input.addEventListener("click", () => input.select());
         });
       }
 

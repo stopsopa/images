@@ -596,7 +596,10 @@
                 align-items: end;
               "
             >
-              <div></div>
+              <div class="control-item" style="align-items: center">
+                <label style="font-size: 0.65rem">Restrict</label>
+                <input type="checkbox" id="restrict-crop" style="width: auto" />
+              </div>
               <div class="control-item" style="align-items: center">
                 <label>Top</label>
                 <input
@@ -901,6 +904,7 @@
         padRight: document.getElementById("pad-right"),
         padBottom: document.getElementById("pad-bottom"),
         padLeft: document.getElementById("pad-left"),
+        restrictCrop: document.getElementById("restrict-crop"),
 
         exportBtn: document.getElementById("export-btn"),
         toast: document.getElementById("toast"),
@@ -955,9 +959,19 @@
         el.cropWidth.addEventListener("input", () => syncCropFromInputs());
         el.cropHeight.addEventListener("input", () => syncCropFromInputs());
 
-        // Padding Inputs (Right)
         [el.padTop, el.padRight, el.padBottom, el.padLeft].forEach((input) => {
           input.addEventListener("input", syncDownloadInputsFromCropOrPad);
+        });
+
+        el.restrictCrop.addEventListener("change", () => {
+          if (cropper) {
+            const data = cropper.getData();
+            const url = el.imgToCrop.src;
+            setupCropper(url);
+            // Try to restore crop data after re-init if possible, 
+            // though viewMode change might constrain it.
+            setTimeout(() => cropper.setData(data), 0);
+          }
         });
 
         // Download Inputs (Right)
@@ -1180,9 +1194,9 @@
 
         el.imgToCrop.src = url;
         cropper = new Cropper(el.imgToCrop, {
-          viewMode: 0,
+          viewMode: el.restrictCrop.checked ? 1 : 0,
           dragMode: "move",
-          autoCropArea: 0.8,
+          autoCropArea: 1,
           restore: false,
           guides: true,
           center: true,

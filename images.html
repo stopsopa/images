@@ -839,7 +839,6 @@
 
           input.title = "Drag left/right to adjust value";
           input.addEventListener("mousedown", (e) => {
-            if (e.target === document.activeElement) return;
             onMouseDown(e);
           });
           input.addEventListener("click", () => input.select());

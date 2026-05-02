@@ -968,6 +968,7 @@
       let isInternalUpdate = false;
       let isManualDownloadSize = false;
       let isUpdatingDownloadInputs = false;
+      let currentDownloadScale = 1;
 
       let activeAction = null;
       let startRatio = 1;
@@ -1300,6 +1301,7 @@
       function setupCropper(url) {
         if (cropper) cropper.destroy();
         isManualDownloadSize = false;
+        currentDownloadScale = 1;
 
         el.imgToCrop.src = url;
         cropper = new Cropper(el.imgToCrop, {
@@ -1423,10 +1425,8 @@
           el.downloadHeight.value = Math.round(padded.h);
         } else if (el.downloadLock.checked) {
           isUpdatingDownloadInputs = true;
-          const ratio = padded.w / padded.h;
-          el.downloadHeight.value = Math.round(
-            (parseFloat(el.downloadWidth.value) || 1) / ratio,
-          );
+          el.downloadWidth.value = Math.max(1, Math.round(padded.w * currentDownloadScale));
+          el.downloadHeight.value = Math.max(1, Math.round(padded.h * currentDownloadScale));
           isUpdatingDownloadInputs = false;
         }
         updatePreviewDebounced();
@@ -1435,13 +1435,12 @@
       function onDownloadWidthChange() {
         isManualDownloadSize = true;
         if (isUpdatingDownloadInputs) return;
+        const padded = getPaddedDimensions();
+        currentDownloadScale = (parseFloat(el.downloadWidth.value) || 1) / padded.w;
+
         if (el.downloadLock.checked) {
           isUpdatingDownloadInputs = true;
-          const padded = getPaddedDimensions();
-          const ratio = padded.w / padded.h;
-          el.downloadHeight.value = Math.round(
-            (parseFloat(el.downloadWidth.value) || 1) / ratio,
-          );
+          el.downloadHeight.value = Math.max(1, Math.round(padded.h * currentDownloadScale));
           isUpdatingDownloadInputs = false;
         }
         updatePreviewDebounced();
@@ -1450,13 +1449,12 @@
       function onDownloadHeightChange() {
         isManualDownloadSize = true;
         if (isUpdatingDownloadInputs) return;
+        const padded = getPaddedDimensions();
+        currentDownloadScale = (parseFloat(el.downloadHeight.value) || 1) / padded.h;
+
         if (el.downloadLock.checked) {
           isUpdatingDownloadInputs = true;
-          const padded = getPaddedDimensions();
-          const ratio = padded.w / padded.h;
-          el.downloadWidth.value = Math.round(
-            (parseFloat(el.downloadHeight.value) || 1) * ratio,
-          );
+          el.downloadWidth.value = Math.max(1, Math.round(padded.w * currentDownloadScale));
           isUpdatingDownloadInputs = false;
         }
         updatePreviewDebounced();

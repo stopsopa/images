@@ -1514,7 +1514,27 @@
         finalCtx.imageSmoothingEnabled = true;
         finalCtx.imageSmoothingQuality = "high";
 
-        finalCtx.drawImage(interCanvas, 0, 0, dw, dh);
+        let curCanvas = interCanvas;
+        let curW = interW;
+        let curH = interH;
+
+        // Step-down scaling (halving steps) to prevent aliasing/jagged edges
+        while (curW > dw * 2 && curH > dh * 2) {
+          const nextW = Math.floor(curW / 2);
+          const nextH = Math.floor(curH / 2);
+          const nextCanvas = document.createElement("canvas");
+          nextCanvas.width = nextW;
+          nextCanvas.height = nextH;
+          const nextCtx = nextCanvas.getContext("2d");
+          nextCtx.imageSmoothingEnabled = true;
+          nextCtx.imageSmoothingQuality = "high";
+          nextCtx.drawImage(curCanvas, 0, 0, nextW, nextH);
+          curCanvas = nextCanvas;
+          curW = nextW;
+          curH = nextH;
+        }
+
+        finalCtx.drawImage(curCanvas, 0, 0, dw, dh);
         return finalCanvas;
       }
 

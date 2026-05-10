@@ -850,7 +850,7 @@
         const loader = document.getElementById("loader");
 
         try {
-          const response = await fetch("process.json");
+          const response = await fetch(`process.json?v=${Date.now()}`);
           if (!response.ok) throw new Error(`Failed to fetch process.json`);
           let body = response.body;
           if (

@@ -27,5 +27,5 @@
   //   "db/**/*.ts",
   //   "shared/**/*.ts"
   // ],
-  "exclude": ["node_modules", "models_from_other_project"]
+  "exclude": ["node_modules"]
 }

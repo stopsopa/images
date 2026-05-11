@@ -7,28 +7,60 @@
 }
 @es.ts */
 
+// see TRANSPILATION.md
+
 import * as esbuild from "esbuild";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join, basename, resolve, relative } from "node:path";
 import { stdin, env } from "node:process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import Semaphore from "./libs/Semaphore.ts";
+
+class Semaphore {
+  private permits: number;
+  private maxPermits: number;
+  private waiters: (() => void)[] = [];
+  constructor(permits: number) {
+    this.maxPermits = this.permits = permits;
+  }
+  acquire() {
+    return new Promise<void>((resolve) => {
+      if (this.permits > 0) {
+        this.permits -= 1;
+        resolve();
+      } else {
+        this.waiters.push(resolve);
+      }
+    });
+  }
+  release() {
+    const next = this.waiters.shift();
+    if (next) {
+      next();
+    } else {
+      if (this.permits !== this.maxPermits) {
+        this.permits += 1;
+      }
+    }
+  }
+}
 
 const th = (msg: string) => new Error(`es.ts error: ${msg}`);
 
-interface Config {
+interface InternalConfig {
   target: string;
   loader: esbuild.Loader;
-  charset: "utf8" | "ascii" | undefined;
+  format: "esm" | "cjs" | "iife";
+  charset: "utf8" | "ascii";
   minify: boolean;
   bundle: boolean;
   extension: string;
 }
 
-const CONFIG: Config = {
+const CONFIG: InternalConfig = {
   target: "esnext",
   loader: "ts",
+  format: "esm",
   charset: "utf8",
   minify: false,
   bundle: false,
@@ -87,14 +119,13 @@ if (!PRODUCE_GITIGNORE) {
 
 var SLASH = "/";
 
-async function stripTypes(filePath: string): Promise<string | undefined> {
+async function stripTypes(filePath: string): Promise<{ outPath: string | undefined; config: any } | undefined> {
   try {
     const source = readFileSync(filePath, "utf8");
     const startMarker = "/** @es.ts";
     const endMarker = `@es.ts *${SLASH}`;
 
-    let buildMode: "bundle" | "transform" = CONFIG.bundle ? "bundle" : "transform";
-    let localOptions: any = { ...CONFIG };
+    let config: any = {};
 
     const startIndex = source.indexOf(startMarker);
     const endIndex = source.indexOf(endMarker);
@@ -103,40 +134,53 @@ async function stripTypes(filePath: string): Promise<string | undefined> {
       const configStr = source.substring(startIndex + startMarker.length, endIndex).trim();
       try {
         // Using Function to safely parse the object literal (allows unquoted keys)
-        const config = new Function(`return (${configStr})`)();
-        if (config.mode) {
-          if (config.mode !== "bundle" && config.mode !== "transform") {
-            throw th(`Invalid mode "${config.mode}" in ${filePath}. Only "bundle" or "transform" are allowed.`);
-          }
-          buildMode = config.mode;
-        }
-        if (config.extension) {
-          localOptions.extension = config.extension;
-        }
-        if (config.options) {
-          localOptions = { ...localOptions, ...config.options };
-        }
+        config = new Function(`return (${configStr})`)();
       } catch (e: any) {
-        if (e.message.includes('Invalid mode "')) {
-          throw e;
-        }
         console.error(`Error parsing @es.ts config in ${filePath}: ${e.message}`);
       }
     }
 
-    const outPath: string = join(dirname(filePath), basename(filePath).replace(/\.ts$/, localOptions.extension));
+    const buildMode = config.mode || (CONFIG.bundle ? "bundle" : "transform");
+    const extension = config.extension || CONFIG.extension;
+    const loader = config.loader || CONFIG.loader;
 
-    const options: esbuild.BuildOptions = {
-      entryPoints: [filePath],
+    // 1. Prepare base options from defaults
+    let baseOptions: esbuild.BuildOptions = {
+      target: CONFIG.target as any,
+      charset: CONFIG.charset,
+      minify: CONFIG.minify,
       bundle: buildMode === "bundle",
-      write: false,
-      target: localOptions.target as any,
-      charset: localOptions.charset,
-      minify: localOptions.minify,
-      legalComments: "inline",
+      format: CONFIG.format,
       platform: "node",
-      format: "esm",
+      legalComments: "inline",
+    };
+
+    // 2. If 'setup' is provided, it replaces the base options
+    if (config.setup) {
+      baseOptions = { ...config.setup };
+    }
+
+    // 3. Merge top-level config fields (excluding tool-specific ones)
+    const { mode, extension: _ext, setup, options, cliarguments, ...rest } = config;
+    const mergedOptions: any = {
+      ...baseOptions,
+      ...rest,
+    };
+
+    // Allow unsetting defaults by passing undefined
+    Object.keys(mergedOptions).forEach((key) => {
+      if (mergedOptions[key] === undefined) {
+        delete mergedOptions[key];
+      }
+    });
+
+    // 4. Force essential options and inject plugin
+    const finalOptions: esbuild.BuildOptions = {
+      ...mergedOptions,
+      entryPoints: [filePath],
+      write: false,
       plugins: [
+        ...(mergedOptions.plugins || []),
         {
           name: "protect-comments",
           setup(build) {
@@ -145,35 +189,49 @@ async function stripTypes(filePath: string): Promise<string | undefined> {
               const contents = content
                 .replace(/\/\*\*/g, "/*!") // JSDoc -> Legal block
                 .replace(/\/\/ /g, "//! "); // Single line -> Legal line
-              return { contents, loader: "ts" };
+              return { contents, loader };
             });
           },
         },
       ],
     };
 
+    // 5. Handle output path defaulting if not specified
+    if (!finalOptions.outfile && !finalOptions.outdir) {
+      finalOptions.outfile = join(dirname(filePath), basename(filePath).replace(/\.ts$/, extension));
+    }
+
     if (env.DEBUG) {
-      console.log(JSON.stringify(options, null, 2));
+      console.log(`Final esbuild options for ${filePath}:`);
+      console.log(JSON.stringify(finalOptions, null, 2));
     }
 
-    const result = await esbuild.build(options);
+    const result = await esbuild.build(finalOptions);
 
-    if (result.outputFiles && result.outputFiles[0]) {
-      let outputText: string = result.outputFiles[0].text;
+    let firstOutPath: string | undefined;
 
-      // Restore protected comments
-      outputText = outputText
-        .replace(/\/\*\!/g, "/**")
-        .replace(/\/\/! /g, "// ")
-        .replace(/(@es\.ts \*\/\s*)/g, `@es.ts *${SLASH}`);
+    if (result.outputFiles) {
+      for (const file of result.outputFiles) {
+        let outputText: string = file.text;
 
-      writeFileSync(outPath, outputText);
+        // Restore protected comments
+        outputText = outputText
+          .replace(/\/\*\!/g, "/**")
+          .replace(/\/\/! /g, "// ")
+          .replace(/(@es\.ts \*\/\s*)/g, `@es.ts *${SLASH}`);
+
+        writeFileSync(file.path, outputText);
+
+        if (!firstOutPath) {
+          firstOutPath = file.path;
+        }
+      }
     }
 
-    if (!PRODUCE_GITIGNORE) {
-      console.log(`${buildMode === "bundle" ? "Bundled" : "Transpiled"} (esbuild): ${filePath} -> ${outPath}`);
-    }
-    return outPath;
+    return {
+      outPath: firstOutPath,
+      config,
+    };
   } catch (err: unknown) {
     hasError = true;
     const message = err instanceof Error ? err.message : String(err);
@@ -268,12 +326,22 @@ Description:
     Add this block to a .ts file to override default behavior:
 /** @es.ts 
 {
-    mode: "bundle|transform",
-    extension: ".js|.mjs",
-    options: {
-      target: "esnext", loader: "ts", 
-      charset: "utf8", minify: false
-    }
+    // Tool-specific keys:
+    mode: "bundle|transform", // optional, shorthand for bundle: true/false
+    extension: ".js|.mjs",    // optional, default output extension
+    setup: { ... },           // optional, if present replaces all default esbuild options
+
+    // Any other keys are treated as esbuild BuildOptions and merged with defaults:
+    target: "esnext", 
+    minify: false,
+    platform: "node",
+    // ...
+    
+    // Use 'undefined' to unset a default and let esbuild decide:
+    minify: undefined,
+
+    // Overriding command line arguments:
+    "cliarguments": ["--produce-gitignore"], // override global arguments for this file
 }
 @es.ts *${SLASH}
   
@@ -282,7 +350,7 @@ Description:
     to esbuild.transform (input and options) are dumped to the 
     console for each processed file.
   
-Built-in Config:
+Built-in Config (generated internally - so it is true setup which will be really used):
 ${JSON.stringify(CONFIG, null, 2)}
 `);
 }
@@ -299,7 +367,8 @@ const rl = createInterface({
 
 let processedCount: number = 0;
 let hasError: boolean = false;
-const gitignorePaths: string[] = [];
+const gitignorePaths: string[] = []; // paths to produce in stdout
+const updatePaths: string[] = []; // paths to actually update in .gitignore
 const semaphore = new Semaphore(ES_PARALLEL);
 const activeTasks = new Set<Promise<void>>();
 
@@ -312,9 +381,26 @@ for await (const line of rl) {
     // Start the task and keep track of it in the activeTasks Set
     const task: Promise<void> = (async () => {
       try {
-        const outPath = await stripTypes(file);
-        if (PRODUCE_GITIGNORE && outPath) {
-          gitignorePaths.push(outPath);
+        const result = await stripTypes(file);
+        if (result && result.outPath) {
+          const { outPath, config } = result;
+          const buildMode = config.mode || (CONFIG.bundle ? "bundle" : "transform");
+          if (!PRODUCE_GITIGNORE) {
+            console.log(`${buildMode === "bundle" ? "Bundled" : "Transpiled"} (esbuild): ${file} -> ${outPath}`);
+          }
+
+          const localArgs = Array.isArray(config.cliarguments) ? config.cliarguments : args;
+
+          const localProduceGitignore = localArgs.includes("--produce-gitignore");
+          const localUpdateGitignore = localArgs.includes("--update");
+
+          if (localProduceGitignore) {
+            const relPath = relative(gitRoot, outPath);
+            gitignorePaths.push(relPath);
+            if (localUpdateGitignore) {
+              updatePaths.push(relPath);
+            }
+          }
         }
       } finally {
         semaphore.release();
@@ -334,7 +420,7 @@ if (PRODUCE_GITIGNORE && gitignorePaths.length > 0) {
   let pathsToLog = gitignorePaths;
 
   if (UPDATE_GITIGNORE) {
-    pathsToLog = updateGitignoreFile(gitRoot, startMarker, endMarker, gitignorePaths);
+    pathsToLog = updateGitignoreFile(gitRoot, startMarker, endMarker, updatePaths);
   }
 
   const content = [startMarker, ...pathsToLog.sort(), endMarker].join("\n");

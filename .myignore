@@ -1,5 +1,6 @@
 es.ts
 process.ts
 /libs/*
+!libs/drag.ts
 !/libs/toHumanReadable.ts
 !/libs/fetchProxy/*

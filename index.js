@@ -92,6 +92,7 @@ var filenameUserTouched = false;
 var currentNameWidth = 1200;
 var currentNameHeight = 800;
 var currentNameQuality = 85;
+var existingPaths = [];
 // Elements
 var el = {
   inputStage: document.getElementById("input-stage"),
@@ -211,8 +212,13 @@ function init() {
     'input[name="export-format"]'
   );
   formatRadios.forEach((radio) => {
-    radio.addEventListener("change", updatePreviewDebounced);
+    radio.addEventListener("change", () => {
+      updatePreviewDebounced();
+      checkExistingFilename();
+    });
   });
+  // Check existing filename on input
+  el.filenameInput.addEventListener("input", checkExistingFilename);
   el.exportBtn.addEventListener("click", exportImage);
   // Float Preview logic
   let isPreviewFloating = false;
@@ -282,6 +288,53 @@ function init() {
     }
   });
   setupScrubbableInputs();
+  loadExistingPaths();
+  // Refresh existing paths every 30 seconds
+  setInterval(loadExistingPaths, 3e4);
+}
+// --- Filename existence check ---
+async function loadExistingPaths() {
+  try {
+    const resp = await fetch(`process.json?v=${Date.now()}`);
+    if (resp.ok) {
+      const text = await resp.text();
+      existingPaths = text.split("\n").filter((l) => l.trim()).map((l) => {
+        try {
+          return JSON.parse(l)[0];
+        } catch (e) {
+          return null;
+        }
+      }).filter((p) => p !== null);
+      console.log(`Loaded ${existingPaths.length} existing paths from process.json`);
+      checkExistingFilename();
+    } else {
+      console.error(`Failed to load process.json: ${resp.status} ${resp.statusText}`);
+    }
+  } catch (e) {
+    console.error("Failed to load process.json", e);
+  }
+}
+function checkExistingFilename() {
+  const name = el.filenameInput.value.trim();
+  console.log(`Checking filename: "${name}"`);
+  if (!name) {
+    el.filenameInput.style.color = "";
+    return;
+  }
+  // Check if any existing path (stripped of extension and path) matches this name
+  const exists = existingPaths.some((p) => {
+    const filename = p.split("/").pop() || "";
+    const base = filename.replace(/\.[^/.]+$/, "");
+    const match = base === name;
+    if (match) console.log(`Match found: "${p}" -> base: "${base}"`);
+    return match;
+  });
+  if (exists) {
+    console.log(`Filename "${name}" EXISTS in process.json. Setting color to RED.`);
+    el.filenameInput.style.setProperty("color", "#ef4444", "important");
+  } else {
+    el.filenameInput.style.color = "";
+  }
 }
 // --- Scrubbable Inputs ---
 function setupScrubbableInputs() {
@@ -614,6 +667,7 @@ function syncFilenameInputs() {
   currentNameWidth = newW;
   currentNameHeight = newH;
   currentNameQuality = newQ;
+  checkExistingFilename();
 }
 function updatePreview() {
   if (!cropper || isProcessing) return;
@@ -658,6 +712,20 @@ function updatePreview() {
 var exportConfirmTimeout = null;
 async function exportImage() {
   if (!cropper) return;
+  const name = el.filenameInput.value.trim();
+  const exists = existingPaths.some((p) => {
+    const filename = p.split("/").pop() || "";
+    const base = filename.replace(/\.[^/.]+$/, "");
+    return base === name;
+  });
+  if (exists) {
+    if (el.exportBtn.textContent !== "Overwrite existing?") {
+      el.exportBtn.textContent = "Overwrite existing?";
+      el.exportBtn.style.background = "#ef4444";
+      showToast("File already exists in gallery!", 3e3, "#ef4444");
+      return;
+    }
+  }
   if (!filenameUserTouched) {
     if (el.exportBtn.textContent !== "Download anyway?") {
       el.exportBtn.textContent = "Download anyway?";

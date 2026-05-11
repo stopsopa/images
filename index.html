@@ -1597,9 +1597,7 @@
               const parentRatio = parentRect.height > 0 ? (parentRect.width / parentRect.height) : 1;
               const imgRatio = canvas.height > 0 ? (canvas.width / canvas.height) : 1;
 
-              console.log('el.previewImg bbb', el.previewImg)
               if (imgRatio > parentRatio) {
-              console.log('el.previewImg', el.previewImg)
                 el.previewImg.style.width = "100%";
                 el.previewImg.style.height = "auto";
               } else {
